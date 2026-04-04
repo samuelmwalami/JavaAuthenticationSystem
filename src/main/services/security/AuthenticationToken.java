@@ -1,8 +1,8 @@
 package services.security;
 
 public class AuthenticationToken {
-    String accessTokenExpirationDuration;
-    String refreshTokenExpirationDuration;
+    int accessTokenExpirationDuration ;
+    int refreshTokenExpirationDuration;
 
     public String getAccessToken(){
         return "";

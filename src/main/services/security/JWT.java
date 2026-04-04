@@ -8,7 +8,10 @@ import javax.crypto.Mac;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.*;
 import java.util.Base64;
+import java.util.Map;
+import java.util.TreeMap;
 
 
 /**
@@ -18,21 +21,33 @@ import java.util.Base64;
  *
  */
 public class JWT {
+    private final JWTHeader jwtHeader;
+    private final Map<Object,Object> jwtPayload;
+    private String secret;
+
+
+    JWT(Builder builder){
+        this.jwtHeader = builder.jwtHeader;
+        this.jwtPayload = builder.jwtPayload;
+        this.secret = builder.jwtSecret;
+    }
+
+
     /**
      * Method to get JWT string
-     * @param secret secret for the HMAC algorithm
-     * @param payload the payload Object of the JWT token
      * @return the jwt string
      */
-
-    public static String getJWT(String secret, JWTPayload payload) {
+    public String getJWT() {
         String jwtToken = "";
         try {
-            JWTHeader jwtHeaderObject = new JWTHeader("HS256", "JWT");
+            // Configure Header
+            jwtHeader.setAlg("HS256");
+            jwtHeader.setTyp("JWT");
+
             ObjectMapper mapper = new ObjectMapper();
             // convert header and payload to Json String
-            String jwtHeaderJSON = mapper.writeValueAsString(jwtHeaderObject);
-            String jwtPayloadJSON = mapper.writeValueAsString(payload);
+            String jwtHeaderJSON = mapper.writeValueAsString(jwtHeader);
+            String jwtPayloadJSON = mapper.writeValueAsString(jwtPayload);
 
             //Convert header to base64
             String base64Header = Base64.getUrlEncoder().withoutPadding().encodeToString(jwtHeaderJSON.getBytes());
@@ -54,11 +69,10 @@ public class JWT {
 
     /**
      * Verifies the integrity of the JWT
-     * @param secret secret for HMAC algorithm
      * @param JWTToken jwt token to be checked
      * @return boolean of whether jwt is valid
      */
-    public static boolean verifyJWT(String secret, String JWTToken){
+    public boolean verifyJWT(String JWTToken){
 
         String[] jwtParts = JWTToken.split("\\.");
         String jwtMessage = String.format("%s.%s",jwtParts[0],jwtParts[1]);
@@ -75,9 +89,8 @@ public class JWT {
      * generates Hash-based MAC from message using HMAC256 algorithm
      * @param secret The secret to be used in the HMAC Algorithm
      * @param message The content to be encrypted
-     *
      */
-    public static byte[] getHMAC(String secret, String message){
+    public byte[] getHMAC(String secret, String message){
         String algorithm = "HmacSHA256";
         byte[] hmac = new byte[0];
         try {
@@ -101,10 +114,90 @@ public class JWT {
 
     public static void main(String[] args) {
         String secret = "notsecure";
-        JWTPayload jwtPayload = new JWTPayload("john","auth","1212","1414");
-        String jwt = getJWT(secret,jwtPayload);
-        System.out.println(jwt);
-        System.out.println(String.format("JWT Integrity OK: %s",verifyJWT(secret,jwt)));
+//        JWTPayload jwtPayload = new JWTPayload("john","auth","1212","1414");
+//        String jwt = getJWT(secret,jwtPayload);
+//        System.out.println(jwt);
+//        System.out.println(String.format("JWT Integrity OK: %s",verifyJWT(secret,jwt)));
+
+        ZoneId zone  = ZoneId.of("UTC");
+        LocalDate date = LocalDate.now(zone);
+        LocalTime localTime = LocalTime.now(zone);
+        LocalDateTime dateTime = LocalDateTime.now(zone);
+        System.out.println(date);
+        System.out.println(localTime);
+        System.out.println(Instant.now().getEpochSecond());
+
+        JWT jwtObject = new JWT.Builder()
+                .setIat(dateTime)
+                .setExp(dateTime)
+                .setSecret(secret).
+                setClaim("Hello","World")
+                .compact();
+        String token = jwtObject.getJWT();
+        System.out.println(token);
 
     }
+
+    /**
+     * Model class for the JWT header
+     */
+    private static class JWTHeader {
+        private String alg = "HS256";
+        private String typ = "JWT";
+
+        public String getAlg(){
+            return this.alg;
+        }
+        public String getTyp(){
+            return this.typ;
+        }
+
+        public void setAlg(String alg){
+            this.alg = alg;
+        }
+        public void setTyp(String typ){
+            this.typ = typ;
+        }
+    }
+
+
+    // Builder class for JWT
+    public static class Builder {
+        private final JWTHeader jwtHeader = new JWTHeader();
+        private final Map<Object, Object> jwtPayload = new TreeMap<>();
+        private String jwtSecret;
+
+        public Builder setSub(String sub){
+            jwtPayload.put("sub",sub);
+            return this;
+        }
+        public Builder setIat(LocalDateTime iat){
+            jwtPayload.put("iat",iat.toEpochSecond(ZoneOffset.UTC));
+            return this;
+        }
+        public Builder setExp(LocalDateTime exp){
+            jwtPayload.put("exp",exp.toEpochSecond(ZoneOffset.UTC));
+            return this;
+        }
+
+        public Builder setClaim(Object key, Object value){
+            jwtPayload.put(key,value);
+            return this;
+        }
+
+        public Builder setSecret(String secret){
+            jwtSecret = secret;
+            return this;
+        }
+
+        public Builder setHMACAlgorithm(String algorithm){
+            jwtHeader.setAlg(algorithm);
+            return this;
+        }
+
+        public JWT compact() {
+            return new JWT(this);
+        }
+    }
+
 }

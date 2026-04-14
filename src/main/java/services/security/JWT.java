@@ -1,6 +1,7 @@
 package services.security;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -9,6 +10,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.*;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
 import java.util.TreeMap;
@@ -17,7 +19,7 @@ import java.util.TreeMap;
 /**
  * Class to get and verify JWT token using HS256
  * @author Sam
- * @ version 1.O
+ * @version 1.O
  *
  */
 public class JWT {
@@ -86,6 +88,33 @@ public class JWT {
     }
 
     /**
+     * Gets claim from payload
+     * @param JWTToken Token Issued to the user
+     * @param claim The claim to be searched for in the payload
+     * @return The claim to found if found or an empty string
+     */
+    public Object getPayloadClaim(String JWTToken, String claim) {
+        Object jwtClaim = "";
+        try{
+            // extract claim from the jwt
+            String[] jwtParts  = JWTToken.split("\\.");
+            String base64jwtPayload = Arrays.toString(Base64.getDecoder().decode(jwtParts[1]));
+            ObjectMapper mapper = new ObjectMapper();
+            TreeMap<Object,Object> claims  = mapper.readValue(base64jwtPayload, new TypeReference<TreeMap<Object, Object>>() {});
+            if(!claims.containsKey(claim)){
+                return jwtClaim;
+            }
+
+            jwtClaim = claims.get(claim);
+        }
+        catch(JsonProcessingException e){
+            System.out.println(e);
+        }
+        return jwtClaim;
+
+    }
+
+    /**
      * generates Hash-based MAC from message using HMAC256 algorithm
      * @param secret The secret to be used in the HMAC Algorithm
      * @param message The content to be encrypted
@@ -108,33 +137,6 @@ public class JWT {
         }
 
         return hmac;
-
-    }
-
-
-    public static void main(String[] args) {
-        String secret = "notsecure";
-//        JWTPayload jwtPayload = new JWTPayload("john","auth","1212","1414");
-//        String jwt = getJWT(secret,jwtPayload);
-//        System.out.println(jwt);
-//        System.out.println(String.format("JWT Integrity OK: %s",verifyJWT(secret,jwt)));
-
-        ZoneId zone  = ZoneId.of("UTC");
-        LocalDate date = LocalDate.now(zone);
-        LocalTime localTime = LocalTime.now(zone);
-        LocalDateTime dateTime = LocalDateTime.now(zone);
-        System.out.println(date);
-        System.out.println(localTime);
-        System.out.println(Instant.now().getEpochSecond());
-
-        JWT jwtObject = new JWT.Builder()
-                .setIat(dateTime)
-                .setExp(dateTime)
-                .setSecret(secret).
-                setClaim("Hello","World")
-                .compact();
-        String token = jwtObject.getJWT();
-        System.out.println(token);
 
     }
 
@@ -175,7 +177,15 @@ public class JWT {
             jwtPayload.put("iat",iat.toEpochSecond(ZoneOffset.UTC));
             return this;
         }
-        public Builder setExp(LocalDateTime exp){
+        public Builder setExp(LocalDateTime exp) throws IatGreaterThanExpException {
+            long expEpoch = exp.toEpochSecond(ZoneOffset.UTC);
+            if(jwtPayload.containsKey("iat")){
+                if(!isExpAfterIat((long)jwtPayload.get("iat"),expEpoch)){
+                    throw new IatGreaterThanExpException();
+                }
+
+            };
+
             jwtPayload.put("exp",exp.toEpochSecond(ZoneOffset.UTC));
             return this;
         }
@@ -193,6 +203,13 @@ public class JWT {
         public Builder setHMACAlgorithm(String algorithm){
             jwtHeader.setAlg(algorithm);
             return this;
+        }
+
+        private boolean isExpAfterIat(long iatEpoch, long expEpoch){
+            if(expEpoch < 0 || iatEpoch < 0){
+                return false;
+            }
+            return expEpoch > iatEpoch;
         }
 
         public JWT compact() {

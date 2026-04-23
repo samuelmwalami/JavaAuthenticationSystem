@@ -6,9 +6,9 @@ import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 
 public class DatabaseConnection {
-    private static final String URL = "";
-    private static final String USER = "";
-    private static final String PASSWORD = "";
+    private static final String URL = "jdbc:postgresql://";
+    private static final String USER = "podtgres";
+    private static final String PASSWORD = "1234";
     private static Connection databaseConnection= null;
     private DatabaseConnection(){
     }

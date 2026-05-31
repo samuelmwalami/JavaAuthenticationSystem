@@ -1,8 +1,9 @@
-package services.security;
+package lib.security;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lib.security.Exceptions.IatGreaterThanExpException;
 
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.Mac;
@@ -173,11 +174,13 @@ public class JWT {
             jwtPayload.put("sub",sub);
             return this;
         }
-        public Builder setIat(LocalDateTime iat){
+        private Builder setIat(LocalDateTime iat){
             jwtPayload.put("iat",iat.toEpochSecond(ZoneOffset.UTC));
             return this;
         }
         public Builder setExp(LocalDateTime exp) throws IatGreaterThanExpException {
+            LocalDateTime issuedAtTime = LocalDateTime.now(ZoneId.of("UTC"));
+            jwtPayload.put("iat",issuedAtTime.toEpochSecond(ZoneOffset.UTC));
             long expEpoch = exp.toEpochSecond(ZoneOffset.UTC);
             if(jwtPayload.containsKey("iat")){
                 if(!isExpAfterIat((long)jwtPayload.get("iat"),expEpoch)){

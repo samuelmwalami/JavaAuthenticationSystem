@@ -1,4 +1,4 @@
-package Servlets;
+package modules.authentication.API;
 
 
 import jakarta.servlet.annotation.WebServlet;
@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.StringBuilder;
 
 
 @WebServlet("/auth/login")

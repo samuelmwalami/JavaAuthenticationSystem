@@ -1,15 +1,14 @@
-package modules.authentication.services.dto.responseDTO;
+package modules.authentication.DTO.responseDTO;
 
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Setter
 @Getter
 public class UserDetailsResponse {
-    UUID id;
+    UUID userId;
     String firstName;
     String lastName;
     String userName;

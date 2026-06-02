@@ -1,14 +1,14 @@
 package modules.authentication.API;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import modules.authentication.services.AuthenticationService;
-import modules.authentication.services.dto.responseDTO.Response;
-import modules.authentication.services.dto.responseDTO.SignupResponse;
+import modules.authentication.DTO.requestDTO.SignupRequest;
+import modules.authentication.DTO.responseDTO.Response;
+import modules.authentication.DTO.responseDTO.SignupResponse;
 
 
 import java.io.BufferedReader;
@@ -17,19 +17,19 @@ import java.io.PrintWriter;
 
 @WebServlet("/auth/signup")
 public class SignUp extends HttpServlet {
-    ObjectMapper mapper = new ObjectMapper();
-    AuthenticationService authenticationService = new AuthenticationService();
+    ObjectMapper mapper;
+    AuthenticationService authenticationService;
 
     @Override
     public void init(){
-       // AuthenticationService authenticationService = new AuthenticationService();
-
+       authenticationService = new AuthenticationService();
+       mapper  =  new ObjectMapper();
     }
 
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response){
-        response.setCharacterEncoding("UTF8");
+        response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
         try {
             StringBuilder requestBuffer= new StringBuilder();
@@ -39,13 +39,16 @@ public class SignUp extends HttpServlet {
             while ((requestLine = requestReader.readLine()) != null){
                 requestBuffer.append(requestLine);
             }
+
             String requestJSON = requestBuffer.toString();
+            SignupRequest signupRequest = mapper.readValue(requestJSON, SignupRequest.class);
+
+            Response<SignupResponse> responseObject = authenticationService.registerUser(signupRequest);
+            String responseJSON = mapper.writeValueAsString(responseObject);
 
             PrintWriter out = response.getWriter();
-
-            Response<SignupResponse> responseObject = authenticationService.registerUser(requestJSON);
-            String responseJSON = mapper.writeValueAsString(responseObject);
             out.write(responseJSON);
+
             if (!responseObject.errors.isEmpty()){
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             }

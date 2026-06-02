@@ -11,10 +11,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.*;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 
 /**
@@ -25,7 +22,7 @@ import java.util.TreeMap;
  */
 public class JWT {
     private final JWTHeader jwtHeader;
-    private final Map<Object,Object> jwtPayload;
+    private final Map<String,Object> jwtPayload;
     private String secret;
 
 
@@ -167,17 +164,14 @@ public class JWT {
     // Builder class for JWT
     public static class Builder {
         private final JWTHeader jwtHeader = new JWTHeader();
-        private final Map<Object, Object> jwtPayload = new TreeMap<>();
+        private final Map<String, Object> jwtPayload = new TreeMap<>();
         private String jwtSecret;
 
         public Builder setSub(String sub){
             jwtPayload.put("sub",sub);
             return this;
         }
-        private Builder setIat(LocalDateTime iat){
-            jwtPayload.put("iat",iat.toEpochSecond(ZoneOffset.UTC));
-            return this;
-        }
+
         public Builder setExp(LocalDateTime exp) throws IatGreaterThanExpException {
             LocalDateTime issuedAtTime = LocalDateTime.now(ZoneId.of("UTC"));
             jwtPayload.put("iat",issuedAtTime.toEpochSecond(ZoneOffset.UTC));
@@ -193,8 +187,8 @@ public class JWT {
             return this;
         }
 
-        public Builder setClaim(Object key, Object value){
-            jwtPayload.put(key,value);
+        public Builder setClaims(Map<String,Object> claims){
+            jwtPayload.putAll(claims);
             return this;
         }
 

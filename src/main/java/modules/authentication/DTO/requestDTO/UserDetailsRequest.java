@@ -1,4 +1,4 @@
-package modules.authentication.services.dto.requestDTO;
+package modules.authentication.DTO.requestDTO;
 
 import lombok.Getter;
 import lombok.Setter;

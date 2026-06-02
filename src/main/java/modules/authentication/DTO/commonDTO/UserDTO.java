@@ -1,5 +1,4 @@
-package modules.authentication.Entities;
-
+package modules.authentication.DTO.commonDTO;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -8,8 +7,8 @@ import java.util.UUID;
 
 @Getter
 @Setter
-public class UserEntity {
-    UUID id;
+public class UserDTO {
+    UUID userId;
     String firstName;
     String lastName;
     String userName;
@@ -17,4 +16,4 @@ public class UserEntity {
     String password;
     String confirmPassword;
     LocalDateTime createdAt;
-}
+    }

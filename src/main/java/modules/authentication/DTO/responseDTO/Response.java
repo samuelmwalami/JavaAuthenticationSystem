@@ -1,4 +1,4 @@
-package modules.authentication.services.dto.responseDTO;
+package modules.authentication.DTO.responseDTO;
 
 import java.util.ArrayList;
 

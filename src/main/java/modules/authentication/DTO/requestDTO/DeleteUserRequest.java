@@ -5,6 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class RenewAccessTokenRequest {
-    String accessToken;
+public class DeleteUserRequest {
+    String email;
+    String refreshToken;
 }

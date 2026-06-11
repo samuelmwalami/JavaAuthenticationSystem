@@ -1,4 +1,4 @@
-package lib.security;
+package lib.jwt;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.InvalidKeyException;
@@ -30,7 +30,4 @@ public class JavaHMAC {
 
     }
 
-    public static void main(String [] args){
-        getSHA256Hmac("Hello world", "password");
-    }
 }

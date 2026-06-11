@@ -1,4 +1,4 @@
-package lib.security.Exceptions;
+package lib.jwt.Exceptions;
 
 /**
  * Exception Thrown when

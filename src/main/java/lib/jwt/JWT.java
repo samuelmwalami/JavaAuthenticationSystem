@@ -1,9 +1,9 @@
-package lib.security;
+package lib.jwt;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lib.security.Exceptions.IatGreaterThanExpException;
+import lib.jwt.Exceptions.IatGreaterThanExpException;
 
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.Mac;

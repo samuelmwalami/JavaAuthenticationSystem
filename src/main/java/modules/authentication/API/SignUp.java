@@ -5,10 +5,9 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
 import modules.authentication.DTO.requestDTO.SignupRequest;
-import modules.authentication.DTO.responseDTO.Response;
-import modules.authentication.DTO.responseDTO.SignupResponse;
 
 
 import java.io.BufferedReader;
@@ -43,19 +42,12 @@ public class SignUp extends HttpServlet {
             String requestJSON = requestBuffer.toString();
             SignupRequest signupRequest = mapper.readValue(requestJSON, SignupRequest.class);
 
-            Response<SignupResponse> responseObject = authenticationService.registerUser(signupRequest);
-            String responseJSON = mapper.writeValueAsString(responseObject);
+            ApiResponse signUpResponse = authenticationService.registerUser(signupRequest);
+            String responseJSON = mapper.writeValueAsString(signUpResponse.getContent());
+            response.setStatus(HttpServletResponse.SC_OK);
 
             PrintWriter out = response.getWriter();
             out.write(responseJSON);
-
-            if (!responseObject.errors.isEmpty()){
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            }
-            else{
-                response.setStatus(HttpServletResponse.SC_CREATED);
-            }
-
 
         }
         catch (IOException e){

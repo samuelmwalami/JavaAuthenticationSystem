@@ -6,8 +6,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import modules.authentication.DTO.requestDTO.LogoutRequest;
-import modules.authentication.DTO.responseDTO.LogoutResponse;
-import modules.authentication.DTO.responseDTO.Response;
+import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
 
 import java.io.BufferedReader;
@@ -28,6 +27,7 @@ public class Logout extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response){
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
+        String accessToken = APIHelper.retrieveAccessTokenFromHeader(request);
         try {
             StringBuilder requestBuffer = new StringBuilder();
             BufferedReader reader = request.getReader();
@@ -40,18 +40,13 @@ public class Logout extends HttpServlet {
             String requestJSON = requestBuffer.toString();
             LogoutRequest logoutRequest = mapper.readValue(requestJSON,LogoutRequest.class);
 
-            Response<LogoutResponse> logoutResponse= authenticationService.logoutUser(logoutRequest);
+            ApiResponse logoutResponse= authenticationService.logoutUser(logoutRequest,accessToken);
             String responseJSON = mapper.writeValueAsString(logoutResponse);
+            response.setStatus(logoutResponse.getStatusCode());
 
             PrintWriter out  = response.getWriter();
             out.write(responseJSON);
 
-            if(!logoutResponse.errors.isEmpty()){
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            }
-            else{
-                response.setStatus(HttpServletResponse.SC_OK);
-            }
         }
         catch (IOException e){
             e.printStackTrace();

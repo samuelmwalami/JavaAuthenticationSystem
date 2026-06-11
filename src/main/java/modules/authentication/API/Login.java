@@ -7,8 +7,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import modules.authentication.DTO.requestDTO.LoginRequest;
-import modules.authentication.DTO.responseDTO.LoginResponse;
-import modules.authentication.DTO.responseDTO.Response;
+import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
 
 import java.io.BufferedReader;
@@ -43,18 +42,13 @@ public class Login extends HttpServlet{
             String requestJSON = requestBuffer.toString();
             LoginRequest loginRequest = mapper.readValue(requestJSON, LoginRequest.class);
 
-            Response<LoginResponse> loginResponse = authenticationService.loginUser(loginRequest);
-            String responseJSON = mapper.writeValueAsString(loginResponse);
+            ApiResponse loginResponse = authenticationService.loginUser(loginRequest);
+            String responseJSON = mapper.writeValueAsString(loginResponse.getContent());
+            response.setStatus(loginResponse.getStatusCode());
 
             PrintWriter out  = response.getWriter();
             out.write(responseJSON);
-
-            if(!loginResponse.errors.isEmpty()){
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            }
-            else{
-                response.setStatus(HttpServletResponse.SC_OK);
-            }
+            
 
         } catch (IOException e) {
             throw new RuntimeException(e);

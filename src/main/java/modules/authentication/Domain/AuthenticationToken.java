@@ -1,9 +1,10 @@
 package modules.authentication.Domain;
 
-import lib.security.Exceptions.IatGreaterThanExpException;
-import lib.security.JWT;
+import lib.jwt.Exceptions.IatGreaterThanExpException;
+import lib.jwt.JWT;
 import lombok.Getter;
 import lombok.Setter;
+import utils.ConfigFileReader;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -14,14 +15,14 @@ import java.util.UUID;
 
 
 /**
-     * Class providing the JWS authentication infrastructure for the system
-     * @author SaM
-     * @version 1.0
-     */
-    public class AuthenticationToken {
+ * Class providing the JWS authentication infrastructure for the system
+ * @author SaM
+ * @version 1.0
+ */
+public class AuthenticationToken {
         @Getter
         @Setter
-        UUID tokenId;
+        UUID refreshTokenId;
 
         @Getter
         @Setter
@@ -30,16 +31,30 @@ import java.util.UUID;
         @Getter
         @Setter
         String accessToken;
-        private String SECRET;
+
         private final long ACCESS_TOKEN_EXPIRATION_DURATION = 60*15;
         private final long REFRESH_TOKEN_EXPIRATION_DURATION = 60*60*24*7;
+        private static final ConfigFileReader configFileReader = new ConfigFileReader();
 
-        /**
-         * Gets an access token
-         * @return a string of an access token
-         * @throws IatGreaterThanExpException
-         */
-        public  String getAccessToken(String sub, HashMap<String,Object> claims){
+        public  AuthenticationToken(){}
+
+        public AuthenticationToken(
+                UUID refreshTokenId,
+                String refreshToken,
+                String accessToken
+        ){
+            this.refreshTokenId = refreshTokenId;
+            this.refreshToken = refreshToken;
+            this.accessToken = accessToken;
+        }
+
+
+    /**
+     * Gets an access token
+     * @return a string of an access token
+     * @throws IatGreaterThanExpException
+     */
+    public String getAccessToken(String sub, HashMap<String,Object> claims){
             LocalDateTime expirationTime = LocalDateTime.now(ZoneId.of("UTC")).plusSeconds(ACCESS_TOKEN_EXPIRATION_DURATION);
             JWT jwtObject = new JWT.Builder().compact();
             try{
@@ -47,14 +62,12 @@ import java.util.UUID;
                         .setSub(sub)
                         .setExp(expirationTime)
                         .setClaims(claims)
-                        .setSecret(SECRET)
+                        .setSecret(configFileReader.getJWT_ACCESS_TOKEN_SECRET())
                         .compact();
             }
             catch (IatGreaterThanExpException e){
                 e.printStackTrace();
             }
-
-
 
             return jwtObject.getJWT();
         }
@@ -72,7 +85,7 @@ import java.util.UUID;
                         .setSub(sub)
                         .setExp(expirationTime)
                         .setClaims(claims)
-                        .setSecret(SECRET)
+                        .setSecret(configFileReader.getJWT_REFRESH_TOKEN_SECRET())
                         .compact();
             }
             catch (IatGreaterThanExpException e){
@@ -82,7 +95,7 @@ import java.util.UUID;
             return jwtObject.getJWT();
         }
 
-        public String getSub(String token){
+        public static String getSub(String token){
            JWT jwtObject = new JWT.Builder().compact();
            return jwtObject.getPayloadClaim(token,"sub").toString();
         }
@@ -92,7 +105,7 @@ import java.util.UUID;
          * @param jwtToken issued jwt token
          * @return a boolean value showing whether the jwt token has expired
          */
-        public boolean isTokenExpired(String jwtToken){
+        public static boolean isTokenExpired(String jwtToken){
             JWT jwtObject  = new JWT.Builder().compact();
             long currentEpoch = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
             long jwtExpirationEpoch = (long) jwtObject.getPayloadClaim(jwtToken,"exp");
@@ -104,21 +117,47 @@ import java.util.UUID;
          * @param jwtToken the issued jwt token
          * @return a boolean value of  the JWT integrity status
          */
-        public boolean isTokenValid(String jwtToken){
+        public static boolean isRefreshTokenCompromised(String jwtToken){
             JWT jwtObject = new JWT.Builder()
-                    .setSecret(SECRET)
+                    .setSecret(configFileReader.getJWT_REFRESH_TOKEN_SECRET())
                     .compact();
             return jwtObject.verifyJWT(jwtToken);
 
         }
 
-        public int getAccessTokenExpiryDuration(){
-            return (int) this.ACCESS_TOKEN_EXPIRATION_DURATION;
+        /**
+         * Checks whether the integrity of the access token has been compromise
+         * @param jwtToken the issued jwt token
+         * @return a boolean value of  the JWT integrity status
+         */
+        public static boolean isAccessTokenCompromised(String jwtToken){
+        JWT jwtObject = new JWT.Builder()
+                .setSecret(configFileReader.getJWT_ACCESS_TOKEN_SECRET())
+                .compact();
+        return jwtObject.verifyJWT(jwtToken);
         }
 
-        public int getRefreshTokenExpiryDuration(){
-            return (int) this.REFRESH_TOKEN_EXPIRATION_DURATION;
+
+        public boolean isAccessTokenProvided(){
+            return isTokenProvided(this.accessToken);
         }
+
+        public boolean isRefreshTokenProvided(){
+        return isTokenProvided(this.refreshToken);
+        }
+
+        private boolean isTokenProvided(String token){
+        return !token.isBlank();
+        }
+
+        public static int getAccessTokenExpiryDuration(){
+            return (int) new AuthenticationToken().ACCESS_TOKEN_EXPIRATION_DURATION;
+        }
+
+        public static int getRefreshTokenExpiryDuration(){
+            return (int) new AuthenticationToken().REFRESH_TOKEN_EXPIRATION_DURATION;
+        }
+
 
     }
 

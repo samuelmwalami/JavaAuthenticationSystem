@@ -1,7 +1,6 @@
-package modules.authentication.repository;
+package modules.authentication.repository.storage;
 
 import modules.authentication.DTO.commonDTO.AccessTokenDTO;
-import modules.authentication.infrastructure.TokenDAO;
 
 import java.util.UUID;
 

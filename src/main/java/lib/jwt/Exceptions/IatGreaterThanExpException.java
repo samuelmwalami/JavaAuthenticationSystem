@@ -1,4 +1,4 @@
-package lib.security.Exceptions;
+package lib.jwt.Exceptions;
 
 /**
  * Exception thrown when Issued at Time exceeds the expiration time

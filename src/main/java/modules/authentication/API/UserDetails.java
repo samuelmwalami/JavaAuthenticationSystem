@@ -5,11 +5,10 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import modules.authentication.DTO.requestDTO.SignupRequest;
+import modules.authentication.DTO.requestDTO.DeleteUserRequest;
+import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
 import modules.authentication.DTO.requestDTO.UserDetailsRequest;
-import modules.authentication.DTO.responseDTO.Response;
-import modules.authentication.DTO.responseDTO.UserDetailsResponse;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,10 +27,10 @@ public class UserDetails extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response){
-
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
+        String accessToken = APIHelper.retrieveAccessTokenFromHeader(request);
 
         try {
             BufferedReader reader = request.getReader();
@@ -45,18 +44,15 @@ public class UserDetails extends HttpServlet {
             UserDetailsRequest userDetailsRequest = mapper.readValue(requestJSON, UserDetailsRequest.class);
 
 
-            Response<UserDetailsResponse> responseObject = authenticationService.getUserDetailsByEmail(userDetailsRequest);
-            String responseJSON = mapper.writeValueAsString(responseObject);
+            ApiResponse userDetailsResponse = authenticationService.getUserDetailsByEmail(userDetailsRequest, accessToken);
+            String responseJSON = mapper.writeValueAsString(userDetailsResponse.getContent());
+            response.setStatus(userDetailsResponse.getStatusCode());
 
             PrintWriter out = response.getWriter();
             out.write(responseJSON);
 
-            if(!responseObject.errors.isEmpty()){
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            }
-            else{
-                response.setStatus(HttpServletResponse.SC_OK);
-            }
+
+
 
         }
         catch (IOException e){
@@ -68,6 +64,9 @@ public class UserDetails extends HttpServlet {
     protected void doDelete(HttpServletRequest request, HttpServletResponse response){
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
+
+        String accessToken = APIHelper.retrieveAccessTokenFromHeader(request);
+
         try {
             StringBuilder requestBuffer = new StringBuilder();
             BufferedReader reader = request.getReader();
@@ -78,23 +77,21 @@ public class UserDetails extends HttpServlet {
             }
 
             String requestJSON  = requestBuffer.toString();
-            UserDetailsRequest userDetailsRequest = mapper.readValue(requestJSON, UserDetailsRequest.class);
+            DeleteUserRequest deleteUserRequest = mapper.readValue(requestJSON, DeleteUserRequest.class);
 
-            Response<UserDetailsResponse> responseObject = authenticationService.getUserDetailsByEmail(userDetailsRequest);
-            String responseJSON = mapper.writeValueAsString(responseObject);
+            ApiResponse apiResponse = authenticationService.deleteUserAccount(deleteUserRequest, accessToken);
+            String responseJSON = mapper.writeValueAsString(apiResponse.getContent());
 
             PrintWriter out = response.getWriter();
             out.write(responseJSON);
 
-            if(!responseObject.errors.isEmpty()){
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            }
-            else{
-                response.setStatus(HttpServletResponse.SC_OK);
-            }
+            response.setStatus(apiResponse.getStatusCode());
+
         }
         catch (IOException e){
             e.printStackTrace();
         }
     }
+
+
 }

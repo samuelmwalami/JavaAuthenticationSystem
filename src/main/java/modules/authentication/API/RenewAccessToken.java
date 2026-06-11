@@ -6,8 +6,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import modules.authentication.DTO.requestDTO.RenewAccessTokenRequest;
-import modules.authentication.DTO.responseDTO.RenewAccessTokenResponse;
-import modules.authentication.DTO.responseDTO.Response;
+import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
 
 import java.io.BufferedReader;
@@ -40,18 +39,13 @@ public class RenewAccessToken extends HttpServlet {
             String requestJSON = requestBuffer.toString();
             RenewAccessTokenRequest renewAccessTokenRequest = mapper.readValue(requestJSON, RenewAccessTokenRequest.class);
 
-            Response<RenewAccessTokenResponse> renewAccessTokenResponse = authenticationService.renewAccessToken(renewAccessTokenRequest);
-            String responseJSON = mapper.writeValueAsString(renewAccessTokenResponse);
+            ApiResponse renewAccessTokenResponse = authenticationService.renewAccessToken(renewAccessTokenRequest);
+            String responseJSON = mapper.writeValueAsString(renewAccessTokenResponse.getContent());
+            response.setStatus(renewAccessTokenResponse.getStatusCode());
 
             PrintWriter out = response.getWriter();
             out.write(responseJSON);
 
-            if(!renewAccessTokenResponse.errors.isEmpty()){
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            }
-            else{
-                response.setStatus(HttpServletResponse.SC_OK);
-            }
 
         } catch (IOException e) {
             e.printStackTrace();

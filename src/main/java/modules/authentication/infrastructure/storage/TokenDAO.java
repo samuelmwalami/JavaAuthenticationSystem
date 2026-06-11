@@ -1,8 +1,8 @@
-package modules.authentication.infrastructure;
+package modules.authentication.infrastructure.storage;
 
 import modules.authentication.DTO.commonDTO.AccessTokenDTO;
-import modules.authentication.repository.TokenRepository;
-import utils.DatabaseConnectionUtil;
+import modules.authentication.repository.storage.TokenRepository;
+import utils.DatabaseConnector;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -11,13 +11,17 @@ import java.sql.SQLException;
 import java.util.UUID;
 
 public class TokenDAO implements TokenRepository {
-    DatabaseConnectionUtil databaseConnectionUtil = new DatabaseConnectionUtil();
+
     @Override
     public int saveRefreshToken(AccessTokenDTO token) {
-        final String QUERY = "INSERT INTO jwt(id, refresh_token, user_id ) VALUES(?, ?)";
+        final String QUERY = "INSERT INTO jwt(id, refresh_token, user_id ) " +
+                "VALUES(?, ?, ?) " +
+                "ON CONFLICT(user_id) DO UPDATE " +
+                "SET refresh_token = excluded.refresh_token, id = excluded.id";
+
         int rowsAffected = 0;
 
-        try(Connection conn = databaseConnectionUtil.getDatabaseConnection();
+        try(Connection conn = DatabaseConnector.getDatabaseConnection();
             PreparedStatement statement = conn.prepareStatement(QUERY)){
 
             statement.setObject(1,token.getTokenId());
@@ -38,8 +42,10 @@ public class TokenDAO implements TokenRepository {
     public int deleteRefreshTokenByUserId(UUID userId) {
         int rowsAffected = 0;
         String QUERY = "DELETE FROM jwt  WHERE user_id = ?";
-        try(Connection conn  = databaseConnectionUtil.getDatabaseConnection();
-        PreparedStatement statement = conn.prepareStatement(QUERY);){
+
+        try(Connection conn  = DatabaseConnector.getDatabaseConnection();
+            PreparedStatement statement = conn.prepareStatement(QUERY);){
+
             statement.setObject(1, userId);
             rowsAffected = statement.executeUpdate();
         }
@@ -54,8 +60,10 @@ public class TokenDAO implements TokenRepository {
     public int updateRefreshTokenByUserId(UUID userId, String refreshToken) {
         int rowsAffected = 0;
         final String QUERY = "UPDATE jwt SET refresh_token = ? WHERE user_id = ? ON CONFLICT(user_id) DO UPDATE SET refresh_token = excluded.refreshToken ";
-        try(Connection conn  = databaseConnectionUtil.getDatabaseConnection();
-        PreparedStatement statement = conn.prepareStatement(QUERY)){
+
+        try(Connection conn  = DatabaseConnector.getDatabaseConnection();
+            PreparedStatement statement = conn.prepareStatement(QUERY)){
+
             statement.setString(1, refreshToken);
             statement.setObject(2, userId);
             rowsAffected = statement.executeUpdate();
@@ -70,8 +78,10 @@ public class TokenDAO implements TokenRepository {
     public AccessTokenDTO fetchRefreshToken(String refreshToken) {
         AccessTokenDTO token = new AccessTokenDTO();
         String QUERY = "SELECT * from jwt WHERE refresh_token = ?";
-        try(Connection conn = databaseConnectionUtil.getDatabaseConnection();
-        PreparedStatement statement = conn.prepareStatement(QUERY)){
+
+        try(Connection conn = DatabaseConnector.getDatabaseConnection();
+            PreparedStatement statement = conn.prepareStatement(QUERY)){
+
             statement.setString(1, refreshToken);
             ResultSet rs = statement.executeQuery();
             

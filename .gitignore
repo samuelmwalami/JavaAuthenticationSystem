@@ -41,4 +41,4 @@ build/
 /.smarttomcat
 AuthSystem.iml
 
-config.properties
+src/main/resources/configs/config.properties

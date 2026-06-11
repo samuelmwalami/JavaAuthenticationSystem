@@ -1,165 +1,201 @@
 package modules.authentication.services;
 
+
 import com.fasterxml.uuid.Generators;
 import modules.authentication.DTO.requestDTO.*;
 import modules.authentication.DTO.responseDTO.*;
 import modules.authentication.DTO.commonDTO.*;
 import modules.authentication.Domain.AuthenticationToken;
 import modules.authentication.Domain.User;
-import modules.authentication.infrastructure.TokenDAO;
-import modules.authentication.infrastructure.UserDAO;
-import modules.authentication.repository.TokenRepository;
-import modules.authentication.repository.UserRepository;
-
-import java.util.ArrayList;
+import modules.authentication.infrastructure.security.MessageDigest;
+import modules.authentication.infrastructure.storage.TokenDAO;
+import modules.authentication.infrastructure.storage.UserDAO;
+import modules.authentication.repository.security.MessageDigestRepository;
+import modules.authentication.repository.storage.TokenRepository;
+import modules.authentication.repository.storage.UserRepository;
 import java.util.HashMap;
+import java.util.UUID;
 
 public class AuthenticationService{
     UserRepository userRepository = new UserDAO(); // Storage access Object for User
     TokenRepository tokenRepository = new TokenDAO(); // Storage access object for AuthenticationToken
+    MessageDigestRepository MessageDigestInfrastructure = new MessageDigest(); // MessageDigest infrastructure
 
-    public Response<SignupResponse> registerUser(SignupRequest request) {
-        Response<SignupResponse> response = new Response<>();
-        response.data = new SignupResponse();
+    public ApiResponse registerUser(SignupRequest request) {
+         new ApiResponse();
+
         User user = new User();
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setUserName(request.getUserName());
+        user.setEmail(request.getEmail());
 
-        ArrayList<String> errors = handleInvalidRegistrationInputs(request);
+        IO.println(user.getUserId() + user.getUserName() + user.getLastName() + user.getFirstName() + user.getPassword());
 
-        // return if there is any error
-        if (!errors.isEmpty()){
-            response.errors.addAll(errors);
-            return response;
+        // handle errors if there is any error
+        ApiResponse errorResponse = validateRegistrationInputs(request,user);
+        if (errorResponse!= null){
+            return errorResponse;
         }
 
-        // Map request to UserDTO
-        user.setUserId(Generators.timeBasedEpochGenerator().generate());
-        user.setFirstName(user.getFirstName().toLowerCase());
-        user.setLastName(user.getLastName().toLowerCase());
-        user.setUserName(user.getUserName().toLowerCase());
-        user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
-        user.setConfirmPassword(request.getConfirmPassword());
+        // Hash password
+        String hashedPassword = MessageDigestInfrastructure.hashPassword(request.getPassword());
 
+        user.setUserId(Generators.timeBasedEpochGenerator().generate());
+        user.setPassword(hashedPassword);
+
+        // Map request to UserDTO
         UserDTO userDTO = user.userToUserDTOMapper();
+        IO.println(userDTO.getUserId() + userDTO.getUserName() + userDTO.getLastName() + userDTO.getFirstName() + userDTO.getPassword());
+
 
         // Save user to storage
         int rowsAffected = userRepository.saveUser(userDTO);
         if (rowsAffected != 1){
-            response.errors.add("Account creation not successful");
-            return response;
+            ErrorBody errorBody = new ErrorBody("Error","Account creation not successful");
+            return new ApiResponse(403,errorBody);
         }
 
         // Response
-        SignupResponse signupResponse = new SignupResponse();
-        signupResponse.setMessage("Account created Successfully");
-        signupResponse.setUserId(user.getUserId().toString());
-        response.data = signupResponse;
+        SignupResponse signupResponse = new SignupResponse("Account created Successfully",
+                user.getUserId().toString()
+        );
 
-        return response;
+
+        return new ApiResponse(201, signupResponse);
     }
 
-    public Response<UserDetailsResponse> getUserDetailsByEmail(UserDetailsRequest request){
-        User user = new User();
+    public ApiResponse getUserDetailsByEmail(UserDetailsRequest request, String accessToken){
+        ApiResponse errorResponse = new ApiResponse();
 
-        Response<UserDetailsResponse> response = new Response<>();
-        UserDetailsResponse userDetailsResponse = new UserDetailsResponse();
-        response.data = userDetailsResponse;
+        AuthenticationToken accessTokenObject = new AuthenticationToken();
+        accessTokenObject.setAccessToken(accessToken);
 
-        //Validate input
-        if(!user.isEmailValid(request.getEmail())){
-            response.errors.add("Invalid email");
-            return response;
+        // validate access token
+        if(!isRefreshTokenValid(accessTokenObject, errorResponse)){
+            return errorResponse;
         }
 
-        UserRepository userRepository = new UserDAO();
-        UserDTO userDTO = userRepository.getUserByEmail(request.getEmail());
+        User user = new User();
+        user.setEmail(request.getEmail());
+
+        //Validate input
+        if(!user.isEmailValid()){
+            ErrorBody apiError = new ErrorBody("Error", "Invalid email");
+            return new ApiResponse(401,apiError);
+        }
+
+        UUID userID = UUID.fromString(AuthenticationToken.getSub(accessToken));
+        // Fetch user from storage
+        UserDTO userDTO = userRepository.getUserByEmailAndUserId(request.getEmail(), userID);
 
         // Handle token not found in storage
         if(userDTO.getUserId() == null){
-            response.errors.add("User does not exist");
-            return response;
+            ErrorBody apiError = new ErrorBody("Error", "User does not exist");
+            return new ApiResponse(401,apiError);
         }
 
         // map user details to UserDetailsResponse
-        userDetailsResponse.setUserId(userDTO.getUserId());
-        userDetailsResponse.setFirstName(userDTO.getFirstName());
-        userDetailsResponse.setLastName(userDTO.getLastName());
-        userDetailsResponse.setUserName(userDTO.getUserName());
-        userDetailsResponse.setEmail(userDTO.getEmail());
-        userDetailsResponse.setCreatedAt(userDTO.getCreatedAt().toString());
+        UserDetailsResponse userDetailsResponse = new UserDetailsResponse(userDTO.getUserId(),
+                userDTO.getFirstName(),
+                userDTO.getLastName(),
+                userDTO.getUserName(),
+                userDTO.getEmail(),
+                userDTO.getCreatedAt().toString());
 
-        response.data = userDetailsResponse;
-
-        return response;
+        return new ApiResponse(200,userDetailsResponse);
     }
 
-    public Response<DeleteUserResponse> deleteUserAccount(UserDetailsRequest request){
-        User user = new User();
+    public ApiResponse deleteUserAccount(DeleteUserRequest request,String accessToken){
+        ApiResponse errorResponse = new ApiResponse();
 
-        Response<DeleteUserResponse> response = new Response<>();
-        DeleteUserResponse deleteUserResponse = new DeleteUserResponse();
-
-
-        //Validate input
-        if(!user.isEmailValid(request.getEmail())){
-            response.data = deleteUserResponse;
-            response.errors.add("Invalid email");
-            return response;
+        AuthenticationToken accessTokenObject = new AuthenticationToken();
+        accessTokenObject.setAccessToken(accessToken);
+        // validate access token
+        if(!isAccessTokenValid(accessTokenObject, errorResponse)){
+            return errorResponse;
         }
 
+
+        AuthenticationToken refreshTokenObject = new AuthenticationToken();
+        refreshTokenObject.setRefreshToken(request.getRefreshToken());
+        // validate refresh token
+        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+            return errorResponse;
+        }
+
+        String accessTokenUserId = AuthenticationToken.getSub(accessToken);
+        String refreshTokenUserId = AuthenticationToken.getSub(request.getRefreshToken());
+        // Handle mismatch between user ids of the tokens
+        if(!accessTokenUserId.equals(refreshTokenUserId)){
+            ErrorBody errorBody = new ErrorBody("Error", "Unauthorized. Mismatch of access and refresh token ids");
+            return new ApiResponse(401,errorBody);
+        }
+
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+
+        //Validate email
+        if(!user.isEmailValid()){
+            ErrorBody errorBody = new ErrorBody("Error", "Invalid email");
+            return new ApiResponse(400, errorBody);
+        }
+
+        // delete user
         UserRepository userRepository = new UserDAO();
-        int rowsAffected = userRepository.deleteUser(request.getEmail());
+        int rowsAffected = userRepository.deleteUserByEmailAndUserId(user.getEmail(), UUID.fromString(refreshTokenUserId));
 
         // Handle token not found in storage
         if(rowsAffected != 1){
-            response.data = deleteUserResponse;
-            response.errors.add("Error deleting account");
-            return response;
+            ErrorBody errorBody = new ErrorBody("Error", "Error deleting account");
+            return new ApiResponse(404, errorBody);
         }
 
-        deleteUserResponse.setMessage("Account deleted successfully");
+        DeleteUserResponse deleteUserResponse = new DeleteUserResponse(
+                "Account deleted successfully",
+                refreshTokenUserId);
 
-        response.data = deleteUserResponse;
-
-        return response;
+        return new ApiResponse(204, deleteUserResponse);
     }
 
-    public Response<LoginResponse> loginUser(LoginRequest request){
-        User userDomain = new User();
-        AuthenticationToken authenticationToken = new AuthenticationToken();
+    public ApiResponse loginUser(LoginRequest request){
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPassword(request.getPassword());
 
-        Response<LoginResponse> response = new Response<>();
-        LoginResponse loginResponse = new LoginResponse();
-
-        // Validate input
-        if(!userDomain.isEmailValid(request.getEmail())){
-            response.data = loginResponse;
-            response.errors.add("Use a valid email structure");
-            return response;
-        }
-        if(request.getPassword().isEmpty()){
-            response.data = loginResponse;
-            response.errors.add("Invalid credentials");
-            return response;
+        // Validate email
+        if(!user.isEmailValid()){
+            ErrorBody errorBody = new ErrorBody("Error", "Invalid email");
+            return new ApiResponse(404, errorBody);
         }
 
         // Get user from Storage
-        UserDTO user = userRepository.getUserByEmailAndPassword(request.getEmail(), request.getPassword());
-        if(user.getUserId() == null || user.getUserId().toString().isEmpty()){
-            response.data = loginResponse;
-            response.errors.add("Invalid credentials");
-            return response;
+        UserDTO userDTO = userRepository.getUserWithPasswordByEmail(request.getEmail());
+
+        // check if user exists;
+        if(userDTO.getUserId() == null || userDTO.getUserId().toString().isEmpty()){
+            ErrorBody errorBody = new ErrorBody("Error", "Invalid credentials");
+            return new ApiResponse(401, errorBody);
+
         }
 
-        // get access and refresh token
-        String accessToken = authenticationToken.getAccessToken(user.getUserId().toString(),new HashMap<>());
-        String refreshToken = authenticationToken.getRefreshToken(user.getUserId().toString(), new HashMap<>());
+        // check if password match
+        if(!MessageDigestInfrastructure.verifyPassword(userDTO.getPassword(),user.getPassword())){
+            ErrorBody errorBody = new ErrorBody("Error", "Invalid credentials");
+            return new ApiResponse(401, errorBody);
+        }
+
+        AuthenticationToken authenticationToken = new AuthenticationToken();
+        // get access
+        String accessToken = authenticationToken.getAccessToken(userDTO.getUserId().toString(),new HashMap<>());
+        String refreshToken = authenticationToken.getRefreshToken(userDTO.getUserId().toString(), new HashMap<>());
 
         //save refresh token to storage
         AccessTokenDTO token = new AccessTokenDTO();
         token.setTokenId(Generators.timeBasedEpochGenerator().generate());
         token.setRefreshToken(refreshToken);
-        token.setUserId(user.getUserId());
+        token.setUserId(userDTO.getUserId());
         int rowsAffected = tokenRepository.saveRefreshToken(token);
 
         if (rowsAffected == 1){
@@ -171,110 +207,198 @@ public class AuthenticationService{
 
 
         // Response
-        loginResponse.setMessage("Logged in Successfully");
-        loginResponse.setAccessToken(accessToken);
-        loginResponse.setAccessTokenExpirationDuration(authenticationToken.getAccessTokenExpiryDuration());
-        loginResponse.setRefreshToken(refreshToken);
-        loginResponse.setRefreshTokenExpirationDuration(authenticationToken.getRefreshTokenExpiryDuration());
+        LoginResponse loginResponse = new LoginResponse("Logged in Successfully",
+                refreshToken,
+                accessToken,
+                AuthenticationToken.getRefreshTokenExpiryDuration(),
+                AuthenticationToken.getAccessTokenExpiryDuration()
+        );
 
-        return response;
+        return new ApiResponse(200,loginResponse);
     }
 
-    public Response<LogoutResponse> logoutUser(LogoutRequest request){
-        Response<LogoutResponse> response = new Response<>();
-        LogoutResponse logoutResponse = new LogoutResponse();
+    public ApiResponse logoutUser(LogoutRequest request, String accessToken){
+        ApiResponse errorResponse = new ApiResponse();
 
-        // Handle empty input
-        if(request.getRefreshToken().isEmpty()){
-            response.data = logoutResponse;
-            response.errors.add("Please input the refresh token");
-            return response;
+        // validate access token
+        AuthenticationToken accessTokenObject = new AuthenticationToken();
+        accessTokenObject.setAccessToken(accessToken);
+        if(!isAccessTokenValid(accessTokenObject, errorResponse)){
+            return errorResponse;
         }
 
-        AccessTokenDTO token = tokenRepository.fetchRefreshToken(request.getRefreshToken());
+        // validate refresh token
+        AuthenticationToken refreshTokenObject = new AuthenticationToken();
+        refreshTokenObject.setRefreshToken(request.getRefreshToken());
+        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+            return errorResponse;
+        }
+
+        // Handle mismatch between user ids of the tokens
+        String accessTokenUserId = AuthenticationToken.getSub(accessToken);
+        String refreshTokenUserId = AuthenticationToken.getSub(request.getRefreshToken());
+        if(!accessTokenUserId.equals(refreshTokenUserId)){
+            ErrorBody errorBody = new ErrorBody("Error", "Unauthorized. Mismatch of access and refresh token ids");
+            return new ApiResponse(401, errorBody);
+        }
+
 
         // Handle token not found in storage
-        if(token.getTokenId().toString().isEmpty()){
-            response.data = logoutResponse;
-            response.errors.add("Invalid refresh token");
-            return response;
-        }
-
-        // Response
-        logoutResponse.setMessage("Logged out successfully");
-        logoutResponse.setUserId(token.getUserId().toString());
-        response.data = logoutResponse;
-        return response;
-
-
-    }
-
-    public Response<RenewAccessTokenResponse> renewAccessToken(RenewAccessTokenRequest request){
-        AuthenticationToken authenticationToken = new AuthenticationToken();
-
-        Response<RenewAccessTokenResponse> response = new Response<>();
-        RenewAccessTokenResponse accessTokenResponse  = new RenewAccessTokenResponse();
-
-        // Handle empty input
-        if(request.getRefreshToken().isEmpty()){
-            response.data = accessTokenResponse;
-            response.errors.add("Please input the refresh token");
-            return response;
-        }
-
         AccessTokenDTO token = tokenRepository.fetchRefreshToken(request.getRefreshToken());
-
-        // Handle token not found
         if(token.getTokenId().toString().isEmpty()){
-            response.data = accessTokenResponse;
-            response.errors.add("Invalid refresh token");
-            return response;
+            ErrorBody errorBody = new ErrorBody("Error","Invalid refresh token");
+            return new ApiResponse(401, errorBody);
         }
-
-        // Handle Expired Token
-        if(authenticationToken.isTokenExpired(token.getRefreshToken())){
-            response.data = accessTokenResponse;
-            response.errors.add("Refresh token has Expired");
-            return response;
-        }
-
-        String tokenSub = authenticationToken.getSub(token.getRefreshToken());
-        String newAccessToken = authenticationToken.getAccessToken(tokenSub,new HashMap<>());
 
         // Response
-        accessTokenResponse.setAccessToken(newAccessToken);
-        accessTokenResponse.setAccessTokenExpirationDuration(authenticationToken.getAccessTokenExpiryDuration());
-        response.data = accessTokenResponse;
+        LogoutResponse logoutResponse = new LogoutResponse("Logged out successfully",
+                token.getUserId().toString());
 
-        return response;
+        return new ApiResponse(200, logoutResponse);
+
 
     }
 
-    // Helper Functions
-    public  ArrayList<String> handleInvalidRegistrationInputs(SignupRequest request){
-        User user = new User();
-        ArrayList<String> errors = new ArrayList<>();
+    public ApiResponse renewAccessToken(RenewAccessTokenRequest request){
+        ApiResponse errorResponse = new ApiResponse();
+
+        // validate refresh token
+        AuthenticationToken refreshTokenObject = new AuthenticationToken();
+        refreshTokenObject.setRefreshToken(request.getAccessToken());
+        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+            return errorResponse;
+        }
+
+        // Get new access token
+        String tokenSub = AuthenticationToken.getSub(refreshTokenObject.getRefreshToken());
+        String newAccessToken = new AuthenticationToken().getAccessToken(tokenSub,new HashMap<>());
+
+        // Response
+        RenewAccessTokenResponse renewAccessTokenResponse  = new RenewAccessTokenResponse(
+                newAccessToken,
+                AuthenticationToken.getAccessTokenExpiryDuration()
+        );
+
+
+        return new ApiResponse(200, renewAccessTokenResponse);
+
+    }
+
+    // Helper functions
+    public ApiResponse validateRegistrationInputs(SignupRequest request, User user) {
 
         // validate name fields
-        if (!user.isNameValid(request.getFirstName()) ||
-                !user.isNameValid(request.getLastName()) ||
-                !user.isNameValid(request.getUserName())) {
-            errors.add("All name fields must be filled");
+        if (!user.isFirstNameValid()) {
+            ErrorBody errorBody = new ErrorBody("Error","Invalid first name");
+            return new ApiResponse(400, errorBody);
         }
 
-        // validate password
-        if (!user.doPasswordsMatch(request.getPassword(), request.getConfirmPassword())) {
-            errors.add("The passwords provided do not match");
-        } else {
-            if (user.isPasswordStrong(request.getPassword())) {
-                errors.add("The password provided is not Strong");
-            }
+        if (!user.isLastNameValid()) {
+            ErrorBody errorBody = new ErrorBody("Error","Invalid last name");
+            return new ApiResponse(400, errorBody);
+        }
+
+        if (!user.isUserNameValid()) {
+            ErrorBody errorBody = new ErrorBody("Error","Invalid user name");
+            return new ApiResponse(400, errorBody);
+        }
+
+        // Check if userName exists
+        UserDTO userByName = userRepository.getUserByUserName(user.getUserName().toLowerCase());
+        if(!(userByName.getUserId() == null)){
+            ErrorBody errorBody = new ErrorBody("Error","User name already taken");
+            return new ApiResponse(400, errorBody);
+        }
+
+        // check if passwords match
+        if (!User.doPasswordsMatch(request.getPassword(), request.getConfirmPassword())) {
+            ErrorBody errorBody = new ErrorBody("Error","The passwords provided do not match");
+            return new ApiResponse(400, errorBody);
+
+        }
+        // check password strength
+        if (!User.isPasswordStrong(request.getPassword())) {
+            ErrorBody errorBody = new ErrorBody("Error","The password provided is not Strong");
+            return new ApiResponse(400, errorBody);
         }
 
         // validate email
-        if (!user.isEmailValid(request.getEmail())) {
-            errors.add("Your Email is invalid");
+        if (!user.isEmailValid()){
+            ErrorBody errorBody = new ErrorBody("Error","Your Email is invalid");
+            return  new ApiResponse(400, errorBody);
         }
-        return errors;
+
+        // check if account already exists
+        UserDTO userByEmail = userRepository.getUserByEmail(user.getEmail().toLowerCase());
+        if(!(userByEmail.getUserId() == null)){
+            ErrorBody errorBody = new ErrorBody("Error","Account created using this email already exists");
+            return new ApiResponse(400, errorBody);
+        }
+
+
+        return null;
     }
+
+    public boolean isAccessTokenValid(AuthenticationToken tokenObject, ApiResponse apiResponse){
+
+        // Handle empty token
+        if(tokenObject.isAccessTokenProvided()){
+            ErrorBody errorBody = new ErrorBody("Error", "No access token provided in the header provided");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        // Handle compromised refresh token
+        if(AuthenticationToken.isAccessTokenCompromised(tokenObject.getAccessToken())){
+            ErrorBody errorBody = new ErrorBody("Error", "The integrity of the access token has been compromised");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        // Handle expired token
+        if(AuthenticationToken.isTokenExpired(tokenObject.getAccessToken())){
+            ErrorBody errorBody = new ErrorBody("Error", "Access token has expired");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean isRefreshTokenValid(AuthenticationToken tokenObject, ApiResponse apiResponse){
+        // Handle empty token
+        if(tokenObject.isRefreshTokenProvided()){
+            ErrorBody errorBody = new ErrorBody("Error", "No refresh token provided in the header provided");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        // check for refresh token in storage
+        TokenDAO tokenDAO = new TokenDAO();
+        AccessTokenDTO tokenDTO = tokenDAO.fetchRefreshToken(tokenObject.getRefreshToken());
+
+        if(tokenDTO.getTokenId().toString().isEmpty()){
+            ErrorBody errorBody = new ErrorBody("Error", "Invalid refresh token");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        // Handle compromised refresh token
+        if(AuthenticationToken.isRefreshTokenCompromised(tokenObject.getRefreshToken())){
+            ErrorBody errorBody = new ErrorBody("Error", "The integrity of the refresh token has been compromised");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        // Handle expired token
+        if(AuthenticationToken.isTokenExpired(tokenObject.getRefreshToken())){
+            ErrorBody errorBody = new ErrorBody("Error", "Refresh token has expired");
+            apiResponse = new ApiResponse(401,errorBody);
+            return false;
+        }
+
+        return true;
+    }
+
+
 }

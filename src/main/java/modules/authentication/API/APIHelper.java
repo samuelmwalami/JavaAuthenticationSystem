@@ -12,6 +12,6 @@ public class APIHelper {
             return "";
         }
         String[] headerParts = authorizationHeader.split("\\s+");
-        return headerParts[2];
+        return headerParts[1];
     }
 }

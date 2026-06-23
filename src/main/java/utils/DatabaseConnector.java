@@ -1,11 +1,13 @@
 package utils;
 
+import utils.ConfigReaders.DatabaseConfigReader;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseConnector {
-    private static final ConfigFileReader configFileReader = new ConfigFileReader();
+    private static final DatabaseConfigReader databaseConfigReader = new DatabaseConfigReader();
 
     static{
         try{
@@ -18,9 +20,9 @@ public class DatabaseConnector {
 
     public static Connection getDatabaseConnection() throws SQLException {
         return DriverManager.getConnection(
-                    configFileReader.getDATABASE_URL(),
-                    configFileReader.getDATABASE_USER(),
-                    configFileReader.getDB_PASSWORD());
+                    databaseConfigReader.getDATABASE_URL(),
+                    databaseConfigReader.getDATABASE_USER(),
+                    databaseConfigReader.getDB_PASSWORD());
 
     }
 

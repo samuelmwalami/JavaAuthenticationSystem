@@ -4,7 +4,7 @@ import lib.jwt.Exceptions.IatGreaterThanExpException;
 import lib.jwt.JWT;
 import lombok.Getter;
 import lombok.Setter;
-import utils.ConfigFileReader;
+import utils.ConfigReaders.JWTConfigReader;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -32,9 +32,8 @@ public class AuthenticationToken {
         @Setter
         String accessToken;
 
-        private final long ACCESS_TOKEN_EXPIRATION_DURATION = 60*15;
-        private final long REFRESH_TOKEN_EXPIRATION_DURATION = 60*60*24*7;
-        private static final ConfigFileReader configFileReader = new ConfigFileReader();
+
+        private static final JWTConfigReader jwtConfigReader = new JWTConfigReader();
 
         public  AuthenticationToken(){}
 
@@ -55,14 +54,14 @@ public class AuthenticationToken {
      * @throws IatGreaterThanExpException
      */
     public String getAccessToken(String sub, HashMap<String,Object> claims){
-            LocalDateTime expirationTime = LocalDateTime.now(ZoneId.of("UTC")).plusSeconds(ACCESS_TOKEN_EXPIRATION_DURATION);
+            LocalDateTime expirationTime = LocalDateTime.now(ZoneId.of("UTC")).plusSeconds(jwtConfigReader.getACCESS_TOKEN_EXPIRATION_DURATION());
             JWT jwtObject = new JWT.Builder().compact();
             try{
                 jwtObject = new JWT.Builder()
                         .setSub(sub)
                         .setExp(expirationTime)
                         .setClaims(claims)
-                        .setSecret(configFileReader.getJWT_ACCESS_TOKEN_SECRET())
+                        .setSecret(jwtConfigReader.getJWT_ACCESS_TOKEN_SECRET())
                         .compact();
             }
             catch (IatGreaterThanExpException e){
@@ -78,14 +77,14 @@ public class AuthenticationToken {
          * @throws IatGreaterThanExpException Exception thrown when issued at time exceeds the expiration time
          */
         public String getRefreshToken(String sub, Map<String, Object> claims){
-            LocalDateTime expirationTime = LocalDateTime.now(ZoneId.of("UTC")).plusSeconds(REFRESH_TOKEN_EXPIRATION_DURATION);
+            LocalDateTime expirationTime = LocalDateTime.now(ZoneId.of("UTC")).plusSeconds(jwtConfigReader.getREFRESH_TOKEN_EXPIRATION_DURATION());
             JWT jwtObject = new JWT.Builder().compact();
             try{
                 jwtObject = new JWT.Builder()
                         .setSub(sub)
                         .setExp(expirationTime)
                         .setClaims(claims)
-                        .setSecret(configFileReader.getJWT_REFRESH_TOKEN_SECRET())
+                        .setSecret(jwtConfigReader.getJWT_REFRESH_TOKEN_SECRET())
                         .compact();
             }
             catch (IatGreaterThanExpException e){
@@ -119,7 +118,7 @@ public class AuthenticationToken {
          */
         public static boolean isRefreshTokenCompromised(String jwtToken){
             JWT jwtObject = new JWT.Builder()
-                    .setSecret(configFileReader.getJWT_REFRESH_TOKEN_SECRET())
+                    .setSecret(jwtConfigReader.getJWT_REFRESH_TOKEN_SECRET())
                     .compact();
             return jwtObject.verifyJWT(jwtToken);
 
@@ -132,7 +131,7 @@ public class AuthenticationToken {
          */
         public static boolean isAccessTokenCompromised(String jwtToken){
         JWT jwtObject = new JWT.Builder()
-                .setSecret(configFileReader.getJWT_ACCESS_TOKEN_SECRET())
+                .setSecret(jwtConfigReader.getJWT_ACCESS_TOKEN_SECRET())
                 .compact();
         return jwtObject.verifyJWT(jwtToken);
         }
@@ -147,15 +146,15 @@ public class AuthenticationToken {
         }
 
         private boolean isTokenProvided(String token){
-        return !token.isBlank();
+        return (token != null) && !token.isBlank();
         }
 
         public static int getAccessTokenExpiryDuration(){
-            return (int) new AuthenticationToken().ACCESS_TOKEN_EXPIRATION_DURATION;
+            return (int) jwtConfigReader.getACCESS_TOKEN_EXPIRATION_DURATION();
         }
 
         public static int getRefreshTokenExpiryDuration(){
-            return (int) new AuthenticationToken().REFRESH_TOKEN_EXPIRATION_DURATION;
+            return (int) jwtConfigReader.getACCESS_TOKEN_EXPIRATION_DURATION();
         }
 
 

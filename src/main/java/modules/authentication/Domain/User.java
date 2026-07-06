@@ -91,6 +91,15 @@ public class User {
 
 
 
+
+
+
+
+
+
+
+
+
     public UserDTO userToUserDTOMapper(){
         UserDTO userDTO = new UserDTO();
         userDTO.setUserId(this.userId);

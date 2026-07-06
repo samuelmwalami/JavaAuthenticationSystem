@@ -4,7 +4,7 @@ import EventBus.EventType;
 import EventBus.Listener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import modules.mailing.DTO.OtpDTO;
+import modules.mailing.DTO.EventOtpDTO;
 import modules.mailing.Services.MailingService;
 
 public class PasswordResetListener implements Listener {
@@ -13,17 +13,17 @@ public class PasswordResetListener implements Listener {
 
     @Override
     public void invokeListener(EventType eventType, String message){
-        OtpDTO otpDTO = new OtpDTO();
+        EventOtpDTO otpDTO = new EventOtpDTO();
         try{
-            otpDTO = mapper.readValue(message,OtpDTO.class);
+            otpDTO = mapper.readValue(message, EventOtpDTO.class);
         }
         catch(JsonProcessingException e){
             e.printStackTrace();
         }
 
-        String messageBody = buildResetPasswordEmailBody(otpDTO.getOtp(), otpDTO.getTo());
+        String messageBody = buildResetPasswordEmailBody(otpDTO.getOtp(), otpDTO.getMailTo());
                 String subject = "Password Reset";
-        new MailingService().sendMail(otpDTO.getTo(),subject,messageBody);
+        new MailingService().sendMail(otpDTO.getMailTo(),subject,messageBody);
     }
 
     private String buildResetPasswordEmailBody(String otpCode, String recipientEmail){

@@ -11,4 +11,5 @@ public interface UserRepository {
     public int deleteUserByEmailAndUserId(String email, UUID userID);
     public UserDTO getUserByUserName(String userName);
     public UserDTO getUserByEmail(String email);
+    public int updatePasswordByEmail(String email,String password);
 }

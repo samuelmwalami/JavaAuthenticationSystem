@@ -2,9 +2,9 @@ package modules.mailing.DTO;
 
 import lombok.Getter;
 
-public class OtpDTO {
+public class EventOtpDTO {
     @Getter
-    String to;
+    String mailTo;
     @Getter
     String otp;
 }

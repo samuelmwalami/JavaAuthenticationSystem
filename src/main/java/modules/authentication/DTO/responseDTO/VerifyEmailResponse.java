@@ -1,18 +1,16 @@
 package modules.authentication.DTO.responseDTO;
 
-
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class LoginResponse extends ResponseBody {
+public class VerifyEmailResponse extends ResponseBody {
     String message;
-    public LoginResponse(){}
 
-    public LoginResponse(String message
-
-    ){
+    public VerifyEmailResponse(){
+    }
+    public VerifyEmailResponse(String message){
         this.message = message;
     }
 }

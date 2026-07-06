@@ -7,12 +7,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import modules.mailing.DTO.EventOtpDTO;
 import modules.mailing.Services.MailingService;
 
-public class RegistrationListener implements Listener {
+public class DeleteAccountListener implements Listener {
     ObjectMapper mapper = new ObjectMapper();
 
-
     @Override
-    public void invokeListener(EventType eventType, String message){
+    public void invokeListener(EventType eventType, String message) {
         EventOtpDTO otpDTO = new EventOtpDTO();
         try{
             otpDTO = mapper.readValue(message, EventOtpDTO.class);
@@ -21,19 +20,19 @@ public class RegistrationListener implements Listener {
             e.printStackTrace();
         }
 
-        String messageBody = buildVerifyRegistrationEmailBody(otpDTO.getOtp(), otpDTO.getMailTo());
-        String subject = "Verify Registration Email";
+        String messageBody = buildDeleteAccountEmailBody(otpDTO.getOtp(), otpDTO.getMailTo());
+        String subject = "Verify Account Deletion";
         new MailingService().sendMail(otpDTO.getMailTo(),subject,messageBody);
     }
 
-    private String buildVerifyRegistrationEmailBody(String otpCode, String recipientEmail){
+    private String buildDeleteAccountEmailBody(String otpCode, String recipientEmail){
         return String.format(
                 "<!DOCTYPE html>\n" +
                         "<html>\n" +
                         "<head>\n" +
                         "  <meta charset=\"utf-8\">\n" +
                         "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
-                        "  <title>Verify Your Email</title>\n" +
+                        "  <title>Delete Account</title>\n" +
                         "  <style>\n" +
                         "    @media (prefers-color-scheme: dark) {\n" +
                         "      .dark-bg    { background-color: #14171f !important; }\n" +
@@ -45,11 +44,11 @@ public class RegistrationListener implements Listener {
                         "      .dark-code  { color: #ffffff !important; }\n" +
                         "      .dark-hint  { color: #9aa3b8 !important; }\n" +
                         "      .dark-div   { border-color: #2d3140 !important; }\n" +
-                        "      .dark-btn   { background-color: #6366f1 !important; }\n" +
+                        "      .dark-btn   { background-color: #ef4444 !important; }\n" +
                         "      .dark-foot  { color: #6b7280 !important; }\n" +
                         "      .dark-msg   { color: #d1d5db !important; }\n" +
-                        "      .dark-warn-text { color: #fcd34d !important; }\n" +
-                        "      .dark-warn-strong { color: #fde68a !important; }\n" +
+                        "      .dark-warn-text { color: #fca5a5 !important; }\n" +
+                        "      .dark-warn-strong { color: #fecaca !important; }\n" +
                         "    }\n" +
                         "  </style>\n" +
                         "</head>\n" +
@@ -67,7 +66,7 @@ public class RegistrationListener implements Listener {
                         "                <td style=\"padding-bottom:28px;\">\n" +
                         "                  <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n" +
                         "                    <tr>\n" +
-                        "                      <td style=\"width:40px; height:40px; background:linear-gradient(135deg,#4f46e5,#7c3aed); border-radius:10px; text-align:center; vertical-align:middle; color:#fff; font-weight:700; font-size:18px; letter-spacing:-0.3px;\">SP</td>\n" +
+                        "                      <td style=\"width:40px; height:40px; background:linear-gradient(135deg,#ef4444,#dc2626); border-radius:10px; text-align:center; vertical-align:middle; color:#fff; font-weight:700; font-size:18px; letter-spacing:-0.3px;\">SP</td>\n" +
                         "                      <td style=\"padding-left:10px; font-size:20px; font-weight:700; color:#111827; letter-spacing:-0.3px;\" class=\"dark-text\">Secure<span style=\"color:#4f46e5;\">Pass</span></td>\n" +
                         "                    </tr>\n" +
                         "                  </table>\n" +
@@ -75,8 +74,8 @@ public class RegistrationListener implements Listener {
                         "              </tr>\n" +
                         "            </table>\n" +
                         "\n" +
-                        "            <h1 style=\"font-size:26px; font-weight:700; color:#111827; margin:0 0 6px 0; letter-spacing:-0.3px;\" class=\"dark-text\">Verify your email</h1>\n" +
-                        "            <p style=\"font-size:15px; color:#6b7280; margin:0 0 28px 0; line-height:1.5;\" class=\"dark-sub\">Enter the code below to confirm your registration.</p>\n" +
+                        "            <h1 style=\"font-size:26px; font-weight:700; color:#111827; margin:0 0 6px 0; letter-spacing:-0.3px;\" class=\"dark-text\">Delete account</h1>\n" +
+                        "            <p style=\"font-size:15px; color:#6b7280; margin:0 0 28px 0; line-height:1.5;\" class=\"dark-sub\">Enter the code below to permanently delete your account.</p>\n" +
                         "\n" +
                         "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f8fafc; border-radius:14px; border:2px dashed #e2e8f0; margin-bottom:28px;\" class=\"dark-otp\">\n" +
                         "              <tr>\n" +
@@ -88,15 +87,15 @@ public class RegistrationListener implements Listener {
                         "              </tr>\n" +
                         "            </table>\n" +
                         "\n" +
-                        "            <p style=\"font-size:15px; color:#374151; line-height:1.7; margin:0 0 8px 0;\" class=\"dark-msg\">We received a registration request for <strong style=\"color:#111827;\" class=\"dark-text\">%s</strong>. Please verify your email address to activate your account.</p>\n" +
+                        "            <p style=\"font-size:15px; color:#374151; line-height:1.7; margin:0 0 8px 0;\" class=\"dark-msg\">We received a request to delete the account associated with <strong style=\"color:#111827;\" class=\"dark-text\">%s</strong>. This action is irreversible.</p>\n" +
                         "\n" +
-                        "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#fffbeb; border-left:4px solid #f59e0b; border-radius:8px; margin:20px 0 28px 0;\">\n" +
+                        "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#fef2f2; border-left:4px solid #ef4444; border-radius:8px; margin:20px 0 28px 0;\">\n" +
                         "              <tr>\n" +
                         "                <td style=\"padding:16px 18px;\">\n" +
                         "                  <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n" +
                         "                    <tr>\n" +
                         "                      <td style=\"font-size:20px; vertical-align:top; padding-right:12px;\">⚠\uFE0F</td>\n" +
-                        "                      <td style=\"font-size:14px; color:#78350f; line-height:1.5;\" class=\"dark-warn-text\"><strong style=\"color:#451a03;\" class=\"dark-warn-strong\">Didn't sign up?</strong> &nbsp;Please ignore this email. No changes will be made to your account.</td>\n" +
+                        "                      <td style=\"font-size:14px; color:#991b1b; line-height:1.5;\" class=\"dark-warn-text\"><strong style=\"color:#7f1d1d;\" class=\"dark-warn-strong\">Didn't request this?</strong> &nbsp;Please ignore this email. Your account will remain active.</td>\n" +
                         "                    </tr>\n" +
                         "                  </table>\n" +
                         "                </td>\n" +
@@ -106,7 +105,7 @@ public class RegistrationListener implements Listener {
                         "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n" +
                         "              <tr>\n" +
                         "                <td align=\"center\">\n" +
-                        "                  <a href=\"#\" style=\"display:block; background-color:#4f46e5; color:#ffffff !important; font-weight:600; font-size:15px; padding:13px 20px; border-radius:12px; text-decoration:none; text-align:center;\" class=\"dark-btn\">Verify Email</a>\n" +
+                        "                  <a href=\"#\" style=\"display:block; background-color:#ef4444; color:#ffffff !important; font-weight:600; font-size:15px; padding:13px 20px; border-radius:12px; text-decoration:none; text-align:center;\" class=\"dark-btn\">Confirm Delete</a>\n" +
                         "                </td>\n" +
                         "              </tr>\n" +
                         "            </table>\n" +
@@ -133,5 +132,5 @@ public class RegistrationListener implements Listener {
                 otpCode,
                 recipientEmail
         );
-    }
+        }
 }

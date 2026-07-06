@@ -17,4 +17,5 @@ public class UserDTO extends ResponseBody {
     String email;
     String password;
     LocalDateTime createdAt;
+    boolean emailVerified;
     }

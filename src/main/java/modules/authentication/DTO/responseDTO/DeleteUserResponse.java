@@ -11,9 +11,7 @@ public class DeleteUserResponse extends ResponseBody {
 
     public DeleteUserResponse(){}
 
-    public DeleteUserResponse(String message,
-    String userId){
+    public DeleteUserResponse(String message){
         this.message = message;
-        this.userId = userId;
     }
 }

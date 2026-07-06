@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import modules.authentication.DTO.requestDTO.DeleteUserRequest;
+import modules.authentication.DTO.requestDTO.VerifyDeleteUserRequest;
 import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
 import modules.authentication.DTO.requestDTO.UserDetailsRequest;
@@ -61,7 +62,7 @@ public class UserDetails extends HttpServlet {
     }
 
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response){
+    protected void doPost(HttpServletRequest request, HttpServletResponse response){
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
 
@@ -80,6 +81,39 @@ public class UserDetails extends HttpServlet {
             DeleteUserRequest deleteUserRequest = mapper.readValue(requestJSON, DeleteUserRequest.class);
 
             ApiResponse apiResponse = authenticationService.deleteUserAccount(deleteUserRequest, accessToken);
+            String responseJSON = mapper.writeValueAsString(apiResponse.getContent());
+
+            PrintWriter out = response.getWriter();
+            out.write(responseJSON);
+
+            response.setStatus(apiResponse.getStatusCode());
+
+        }
+        catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response){
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json");
+
+        String accessToken = APIHelper.retrieveAccessTokenFromHeader(request);
+
+        try {
+            StringBuilder requestBuffer = new StringBuilder();
+            BufferedReader reader = request.getReader();
+            String line;
+
+            while((line = reader.readLine()) != null){
+                requestBuffer.append(line);
+            }
+
+            String requestJSON  = requestBuffer.toString();
+            VerifyDeleteUserRequest verifyDeleteUserRequest = mapper.readValue(requestJSON, VerifyDeleteUserRequest.class);
+
+            ApiResponse apiResponse = authenticationService.verifyDeleteUserAccount(verifyDeleteUserRequest, accessToken);
             String responseJSON = mapper.writeValueAsString(apiResponse.getContent());
 
             PrintWriter out = response.getWriter();

@@ -17,7 +17,7 @@ public class TokenDAO implements TokenRepository {
         final String QUERY = "INSERT INTO jwt(id, refresh_token, user_id ) " +
                 "VALUES(?, ?, ?) " +
                 "ON CONFLICT(user_id) DO UPDATE " +
-                "SET refresh_token = excluded.refresh_token, id = excluded.id";
+                "SET refresh_token = EXCLUDED.refresh_token, id = EXCLUDED.id";
 
         int rowsAffected = 0;
 
@@ -28,7 +28,7 @@ public class TokenDAO implements TokenRepository {
             statement.setString(2, token.getRefreshToken());
             statement.setObject(3, token.getUserId());
 
-            rowsAffected = statement.executeUpdate();
+            return statement.executeUpdate();
 
 
         }
@@ -47,7 +47,7 @@ public class TokenDAO implements TokenRepository {
             PreparedStatement statement = conn.prepareStatement(QUERY);){
 
             statement.setObject(1, userId);
-            rowsAffected = statement.executeUpdate();
+            return statement.executeUpdate();
         }
         catch (SQLException e){
             e.printStackTrace();
@@ -66,7 +66,7 @@ public class TokenDAO implements TokenRepository {
 
             statement.setString(1, refreshToken);
             statement.setObject(2, userId);
-            rowsAffected = statement.executeUpdate();
+            return statement.executeUpdate();
         }
         catch (SQLException e){
             e.printStackTrace();

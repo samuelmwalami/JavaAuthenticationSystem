@@ -1,18 +1,17 @@
 package modules.authentication.DTO.responseDTO;
 
-
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class LoginResponse extends ResponseBody {
+public class PasswordResetResponse extends ResponseBody{
     String message;
-    public LoginResponse(){}
 
-    public LoginResponse(String message
+    public PasswordResetResponse(){
+    }
 
-    ){
+    public PasswordResetResponse(String message){
         this.message = message;
     }
 }

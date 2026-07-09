@@ -64,7 +64,7 @@ public class AuthenticationService{
 
 
         // Response
-        SignupResponse signupResponse = new SignupResponse("Account created Successfully. Check your email for OTP code to verify your email",
+        SignupResponse signupResponse = new SignupResponse("Account created successfully. Check your email for OTP code to verify your email",
                 user.getUserId().toString()
         );
         return new ApiResponse(201, signupResponse);
@@ -261,7 +261,7 @@ public class AuthenticationService{
         IO.println(String.format("Rows affected by deleting OTP: %s", otpRowsAffected));
 
         // Response
-        VerifyLoginResponse verifyLoginResponse = new VerifyLoginResponse("Logged in Successfully",
+        VerifyLoginResponse verifyLoginResponse = new VerifyLoginResponse("Logged in successfully",
                 refreshToken,
                 accessToken,
                 AuthenticationToken.getRefreshTokenExpiryDuration(),
@@ -424,7 +424,7 @@ public class AuthenticationService{
         DeleteUserResponse deleteUserResponse = new DeleteUserResponse(
                 "Check your email for OTP Code to verify account deletion");
 
-        return new ApiResponse(204, deleteUserResponse);
+        return new ApiResponse(200, deleteUserResponse);
     }
 
 
@@ -517,7 +517,7 @@ public class AuthenticationService{
                 );
 
 
-        return new ApiResponse(204, verifyDeleteUserResponse);
+        return new ApiResponse(200, verifyDeleteUserResponse);
     }
 
 
@@ -625,14 +625,14 @@ public class AuthenticationService{
         }
         // check password strength
         if (!User.isPasswordStrong(request.getPassword())) {
-            ErrorBody errorBody = new ErrorBody("Error","The password provided is not meet the minimum strength criteria");
+            ErrorBody errorBody = new ErrorBody("Error","The password does not meet the minimum strength criteria.");
             return new ApiResponse(400, errorBody);
         }
 
         // Update password in storage
         String hashedPassword = messageDigestInfrastructure.hashPassword(request.getPassword());
         if(userRepository.updatePasswordByEmail(user.getEmail(), hashedPassword) != 1){
-            ErrorBody errorBody  = new ErrorBody("Error", "There has been a problem in resetting the password.Please try Again");
+            ErrorBody errorBody  = new ErrorBody("Error", "There was a problem resetting the password. Please try again");
             return new ApiResponse(401, errorBody);
         }
 
@@ -711,7 +711,7 @@ public class AuthenticationService{
         }
         // check password strength
         if (!User.isPasswordStrong(request.getPassword())) {
-            ErrorBody errorBody = new ErrorBody("Error","The password provided is not Strong");
+            ErrorBody errorBody = new ErrorBody("Error","The password does not meet the required strength criteria.");
             return new ApiResponse(400, errorBody);
         }
 

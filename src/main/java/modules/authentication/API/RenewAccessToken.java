@@ -13,7 +13,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-@WebServlet("/auth/token/access-token")
+@WebServlet("/auth/token/access")
 public class RenewAccessToken extends HttpServlet {
     AuthenticationService authenticationService;
     ObjectMapper mapper;

@@ -5,7 +5,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import modules.authentication.DTO.requestDTO.VerifyEmailRequest;
 import modules.authentication.DTO.requestDTO.VerifyLoginRequest;
 import modules.authentication.DTO.responseDTO.ApiResponse;
 import modules.authentication.services.AuthenticationService;
@@ -20,7 +19,7 @@ public class VerifyLogin extends HttpServlet {
 
     @Override
     public void init(){
-        authenticationService = new AuthenticationService();
+        authenticationService = AuthenticationService.getInstance();
         mapper  = new ObjectMapper();
     }
 

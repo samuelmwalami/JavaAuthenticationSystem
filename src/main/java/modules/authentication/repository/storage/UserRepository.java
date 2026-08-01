@@ -12,4 +12,5 @@ public interface UserRepository {
     public UserDTO getUserByUserName(String userName);
     public UserDTO getUserByEmail(String email);
     public int updatePasswordByEmail(String email,String password);
+    public int setTrueEmailVerificationStatus(String email);
 }

@@ -4,7 +4,7 @@ import de.mkammerer.argon2.Argon2;
 import de.mkammerer.argon2.Argon2Factory;
 import modules.authentication.repository.security.MessageDigestRepository;
 
-public class MessageDigest implements MessageDigestRepository {
+public class MessageDigestInfrastructure implements MessageDigestRepository {
     private static final Argon2 ARGON2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id);
 
     public String hashPassword(String plainPassword){

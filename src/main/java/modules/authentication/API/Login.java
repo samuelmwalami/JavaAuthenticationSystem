@@ -12,7 +12,7 @@ import modules.authentication.services.AuthenticationService;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.PrintWriter;
+
 
 
 @WebServlet("/auth/login")
@@ -21,7 +21,7 @@ public class Login extends HttpServlet{
     ObjectMapper mapper;
     @Override
     public void init(){
-        authenticationService = new AuthenticationService();
+        authenticationService = AuthenticationService.getInstance();
         mapper = new ObjectMapper();
     }
 
@@ -42,12 +42,12 @@ public class Login extends HttpServlet{
             String requestJSON = requestBuffer.toString();
             LoginRequest loginRequest = mapper.readValue(requestJSON, LoginRequest.class);
 
-            ApiResponse loginResponse = authenticationService.loginUser(loginRequest);
-            String responseJSON = mapper.writeValueAsString(loginResponse.getContent());
-            response.setStatus(loginResponse.getStatusCode());
+            ApiResponse apiResponse = authenticationService.loginUser(loginRequest);
+            String responseJSON = mapper.writeValueAsString(apiResponse.getContent());
 
-            PrintWriter out  = response.getWriter();
-            out.write(responseJSON);
+
+            response.getWriter().write(responseJSON);
+            response.setStatus(apiResponse.getStatusCode());
             
 
         } catch (IOException e) {

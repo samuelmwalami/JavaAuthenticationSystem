@@ -12,7 +12,6 @@ import modules.authentication.DTO.requestDTO.SignupRequest;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.PrintWriter;
 
 @WebServlet("/auth/signup")
 public class SignUp extends HttpServlet {
@@ -21,8 +20,8 @@ public class SignUp extends HttpServlet {
 
     @Override
     public void init(){
-       authenticationService = new AuthenticationService();
-       mapper  =  new ObjectMapper();
+        authenticationService = AuthenticationService.getInstance();
+        mapper = new ObjectMapper();
     }
 
 
@@ -42,12 +41,12 @@ public class SignUp extends HttpServlet {
             String requestJSON = requestBuffer.toString();
             SignupRequest signupRequest = mapper.readValue(requestJSON, SignupRequest.class);
 
-            ApiResponse signUpResponse = authenticationService.registerUser(signupRequest);
-            String responseJSON = mapper.writeValueAsString(signUpResponse.getContent());
-            response.setStatus(HttpServletResponse.SC_OK);
+            ApiResponse apiResponse = authenticationService.registerUser(signupRequest);
+            String responseJSON = mapper.writeValueAsString(apiResponse.getContent());
 
-            PrintWriter out = response.getWriter();
-            out.write(responseJSON);
+            response.getWriter().write(responseJSON);
+
+            response.setStatus(apiResponse.getStatusCode());
 
         }
         catch (IOException e){

@@ -1,13 +1,14 @@
 package modules.mailing.events;
 
+import EventBus.EventOtpDTO;
 import EventBus.EventType;
 import EventBus.Listener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import EventBus.EventOtpDTO;
 import modules.mailing.Services.MailingService;
 
-public class RegistrationListener implements Listener {
+public class OTPListener implements Listener {
+
     ObjectMapper mapper = new ObjectMapper();
     MailingService mailingService = new MailingService();
 
@@ -25,13 +26,11 @@ public class RegistrationListener implements Listener {
         }
 
         IO.println(String.format("Processing the mail for event %s message: %s",eventType,message ));
-        String messageBody = mailingService.buildVerifyRegistrationEmailBody(otpDTO.getOtp(), otpDTO.getMailTo());
+        String messageBody = mailingService.buildGenericOtpEmail(otpDTO.getOtp(), otpDTO.getMailTo());
         String subject = "Verify Registration Email";
 
         IO.println(String.format("Processing the mail for event %s message: %s",eventType,message ));
         mailingService.sendMail(otpDTO.getMailTo(),subject,messageBody);
         IO.println(String.format("Finished sending the mail for event %s message: %s",eventType,message ));
     }
-
-
 }

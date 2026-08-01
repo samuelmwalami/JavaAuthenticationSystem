@@ -39,6 +39,22 @@ public class User {
         this.password = password;
         this.createdAt = createdAt;
     }
+
+    // User registration Constructor
+    public User(
+                String firstName,
+                String lastName,
+                String userName,
+                String email
+
+                ){
+
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.userName = userName;
+        this.email = email;
+
+    }
     
 
 

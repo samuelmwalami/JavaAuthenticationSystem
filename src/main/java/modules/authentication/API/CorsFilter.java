@@ -10,6 +10,8 @@ import java.io.IOException;
 
 @WebFilter("/*")
 public class CorsFilter implements Filter {
+    // 50mb max request size
+    private static final long MAX_REQUEST_SIZE = 1024 *1024 * 50;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -24,6 +26,15 @@ public class CorsFilter implements Filter {
         if("OPTIONS".equalsIgnoreCase(req.getMethod())){
             res.setStatus(HttpServletResponse.SC_OK);
         }
+
+        // set max request size
+        if(req.getContentLengthLong() > MAX_REQUEST_SIZE){
+            res.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+            res.setContentType("application/json");
+            res.getWriter().write("{message: \"ERRROR\",\ncontent : \"Content size too large\"}");
+        }
+
+
 
         filterChain.doFilter(request,response);
     }

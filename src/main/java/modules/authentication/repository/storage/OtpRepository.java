@@ -4,6 +4,7 @@ import modules.authentication.DTO.commonDTO.OtpDTO;
 
 public interface OtpRepository {
     public int saveOtp(OtpDTO otpDTO);
-    public OtpDTO retrieveOtp(String otp, String email);
+    public OtpDTO retrieveOtpByOtpAndEmail(String otp, String email);
+    public OtpDTO retrieveOtpByEmail(String email);
     public int deleteOtpByEmail(String email);
 }

@@ -5,7 +5,6 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class VerifyEmailRequest {
+public class OtpRequest {
     String email;
-    String otp;
 }

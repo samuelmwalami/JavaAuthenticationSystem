@@ -19,7 +19,7 @@ public class VerifyEmail extends HttpServlet {
 
     @Override
     public void init(){
-        authenticationService = new AuthenticationService();
+        authenticationService = AuthenticationService.getInstance();
         mapper  = new ObjectMapper();
     }
 

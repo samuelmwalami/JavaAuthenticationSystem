@@ -3,6 +3,7 @@ package modules.authentication.services;
 
 import EventBus.EventBus;
 import EventBus.EventType;
+import EventBus.EventOtpDTO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.uuid.Generators;
@@ -10,33 +11,49 @@ import modules.authentication.DTO.requestDTO.*;
 import modules.authentication.DTO.responseDTO.*;
 import modules.authentication.DTO.commonDTO.*;
 import modules.authentication.Domain.*;
-import modules.authentication.infrastructure.security.MessageDigest;
+import modules.authentication.infrastructure.security.MessageDigestInfrastructure;
 import modules.authentication.infrastructure.storage.*;
 import modules.authentication.repository.security.MessageDigestRepository;
 import modules.authentication.repository.storage.*;
 
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.UUID;
 
 public class AuthenticationService{
-    UserRepository userRepository = new UserDAO(); // Storage access Object for User
-    TokenRepository tokenRepository = new TokenDAO(); // Storage access object for AuthenticationToken
-    MessageDigestRepository messageDigestInfrastructure = new MessageDigest(); // MessageDigest infrastructure
-    OtpRepository otpRepository = new OtpDAO(); // Storage access object for OTP
+    // Storage access Object for User
+    UserRepository userRepository;
+    // Storage access object for refresh tokens
+    TokenRepository tokenRepository;
+    // MessageDigest infrastructure
+    MessageDigestRepository messageDigestInfrastructure;
+    // Storage access object for OTP
+    OtpRepository otpRepository;
     ObjectMapper mapper = new ObjectMapper();
+
+    private AuthenticationService(
+            UserRepository userRepository,
+            TokenRepository tokenRepository,
+            MessageDigestInfrastructure messageDigestInfrastructure,
+            OtpRepository otpRepository){
+        this.userRepository = userRepository;
+        this.tokenRepository = tokenRepository;
+        this.messageDigestInfrastructure = messageDigestInfrastructure;
+        this.otpRepository = otpRepository;
+
+    }
 
     public ApiResponse registerUser(SignupRequest request) {
          new ApiResponse();
 
-        User user = new User();
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setUserName(request.getUserName());
-        user.setEmail(request.getEmail());
-
-        IO.println(user.getUserId() + user.getUserName() + user.getLastName() + user.getFirstName() + user.getPassword());
+        User user = new User(
+                request.getFirstName(),
+                request.getLastName(),
+                request.getUserName(),
+                request.getEmail()
+        );
 
         // handle errors if there is any error
         ApiResponse errorResponse = validateRegistrationInputs(request,user);
@@ -62,10 +79,41 @@ public class AuthenticationService{
             return new ApiResponse(403,errorBody);
         }
 
+        //Generate otp
+        String otpString = OTP.generateOTP();
+        LocalDateTime otpExpiry = OTP.getOtpExpiryTime();
+
+
+
+        OtpDTO otpDTO = new OtpDTO(
+                Generators.timeBasedEpochGenerator().generate(),
+                otpString,
+                otpExpiry,
+                user.getEmail()
+        );
+
+        // save otp
+        if(otpRepository.saveOtp(otpDTO) != 1){
+            SignupResponse signupResponse = new SignupResponse("Account created successfully but could not send ant otp to your email. Sign in to get an otp code.",
+                    user.getUserId().toString(),
+                    user.getEmail()
+            );
+            return new ApiResponse(401, signupResponse);
+        }
+
+        // publish user registration event
+        try {
+            EventOtpDTO registrationEventMessageObject = new EventOtpDTO(user.getEmail(), otpString);
+            String registrationEventMessageJson = mapper.writeValueAsString(registrationEventMessageObject);
+            EventBus.getInstance().publish(EventType.REGISTRATION, registrationEventMessageJson);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
 
         // Response
-        SignupResponse signupResponse = new SignupResponse("Account created successfully. Check your email for OTP code to verify your email",
-                user.getUserId().toString()
+        SignupResponse signupResponse = new SignupResponse("Account created successfully. Check your email for an OTP code and verify your email",
+                user.getUserId().toString(),
+                user.getEmail()
         );
         return new ApiResponse(201, signupResponse);
     }
@@ -76,7 +124,7 @@ public class AuthenticationService{
         user.setEmail(request.getEmail());
         if(!user.isEmailValid()){
             ErrorBody errorBody =  new ErrorBody("Error", "Invalid email");
-            return new ApiResponse(401, errorBody);
+            return new ApiResponse(400, errorBody);
         }
 
         // Check if account exists
@@ -91,47 +139,101 @@ public class AuthenticationService{
             return new ApiResponse(200,verifyEmailResponse);
         }
 
+
+        // retrieve stored otp
+        OtpDTO otpDTO = otpRepository.retrieveOtpByOtpAndEmail(request.getOtp(),user.getEmail());
+        if(otpDTO.getOtp() == null){
+            ErrorBody errorBody = new ErrorBody("ERROR","Invalid OTP code");
+            return new ApiResponse(401, errorBody);
+        }
+
+        // Check otpExpiry
+        if(OTP.isOtpExpired(otpDTO.getOtpExpiry())){
+            ErrorBody errorBody = new ErrorBody("ERROR","The OTP code has expired");
+            return new ApiResponse(401, errorBody);
+        }
+
+        if(userRepository.setTrueEmailVerificationStatus(user.getEmail()) != 1){
+            ErrorBody errorBody = new ErrorBody("ERROR","There has been a problem verifying the OTP code. Try Again");
+            return new ApiResponse(500, errorBody);
+        }
+
+        VerifyEmailResponse verifyEmailResponse = new VerifyEmailResponse("Email verified successfully");
+
+        return new ApiResponse(200,verifyEmailResponse);
+
+    }
+
+    public ApiResponse getOTPCode(OtpRequest request){
+
+        //Validate email
+        User user = new User();
+        user.setEmail(request.getEmail());
+        if(!user.isEmailValid()){
+            ErrorBody errorBody =  new ErrorBody("Error", "Invalid email");
+            return new ApiResponse(400, errorBody);
+        }
+
+        // Check if account exists
+        UserDTO userDTO = userRepository.getUserByEmail(user.getEmail());
+        if(userDTO.getUserId() == null){
+            ErrorBody errorBody = new ErrorBody("Error", "Account does not exist");
+            return new ApiResponse(401, errorBody);
+        }
+        // Check if email is verified
+        if(userDTO.isEmailVerified()){
+            VerifyEmailResponse verifyEmailResponse = new VerifyEmailResponse("Email has already been verified");
+            return new ApiResponse(200,verifyEmailResponse);
+        }
+        // retrieve stored otp
+        OtpDTO otpDTO = otpRepository.retrieveOtpByEmail(user.getEmail());
+
+        LocalDateTime otpCreationTime;
+        LocalDateTime otpWindowLimit = null;
+        // get otp creation time
+        if(otpDTO.getOtp() != null){
+            otpCreationTime = otpDTO.getOtpExpiry().minusSeconds(OTP.getOTP_EXPIRY_DURATION());
+            otpWindowLimit = otpCreationTime.plusSeconds(OTP.getGET_NEW_OTP_WINDOW_DURATION());
+        }
+        // Limit creating new otp request to after 30 seconds window
+        if(otpDTO.getOtp() != null && otpWindowLimit.isAfter(LocalDateTime.now(ZoneId.of("UTC")))){
+            ErrorBody errorBody = new ErrorBody("ERROR","Cannot request new OTP within 30 seconds after the first request");
+            return new ApiResponse(401, errorBody);
+        }
+
+
         //Generate otp
-        OTP otp = new OTP();
-        String otpString = otp.generateOTP();
-        LocalDateTime otpExpiry = otp.getOtpExpiry();
+        String otpString = OTP.generateOTP();
+        LocalDateTime otpExpiry = OTP.getOtpExpiryTime();
 
 
-        //Send otp
-        OtpDTO otpDTO = new OtpDTO(
+        OtpDTO newOtpDTO = new OtpDTO(
                 Generators.timeBasedEpochGenerator().generate(),
                 otpString,
                 otpExpiry,
                 user.getEmail()
         );
 
-        // save otp
-        if(otpRepository.saveOtp(otpDTO) != 1){
+        // save otp in storage
+        if(otpRepository.saveOtp(newOtpDTO) != 1){
             ErrorBody errorBody = new ErrorBody("Error","Could not verify email please try again");
             return new ApiResponse(401, errorBody);
-        };
+        }
 
-        // publish verify email event
+        // publish otp event
         try {
-            EventOtpDTO registrationEventMessageObject = new EventOtpDTO(user.getEmail(), otpString);
-            String registrationEventMessageJson = mapper.writeValueAsString(registrationEventMessageObject);
-            EventBus.getInstance().publish(EventType.REGISTRATION, registrationEventMessageJson);
+            EventOtpDTO otpEventMessageObject = new EventOtpDTO(user.getEmail(), otpString);
+            String otpEventMessageJson = mapper.writeValueAsString(otpEventMessageObject);
+            EventBus.getInstance().publish(EventType.OTP, otpEventMessageJson);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
 
-        // delete OTP from storage
-        int otpRowsAffected = otpRepository.deleteOtpByEmail(user.getEmail());
-        IO.println(String.format("Rows affected by deleting OTP: %s", otpRowsAffected));
-
 
         // response
-        VerifyEmailResponse verifyEmailResponse = new VerifyEmailResponse("Check your email for OTP to verify your email");
+        OtpResponse verifyEmailResponse = new OtpResponse("Check your email for an OTP code", user.getEmail());
         return new ApiResponse(200,verifyEmailResponse);
-
     }
-
-
 
     public ApiResponse loginUser(LoginRequest request){
         User user = new User();
@@ -141,7 +243,7 @@ public class AuthenticationService{
         // Validate email
         if(!user.isEmailValid()){
             ErrorBody errorBody = new ErrorBody("Error", "Invalid email");
-            return new ApiResponse(404, errorBody);
+            return new ApiResponse(400, errorBody);
         }
 
         // Get user from Storage
@@ -161,9 +263,8 @@ public class AuthenticationService{
         }
 
         //Generate otp
-        OTP otp = new OTP();
-        String otpString = otp.generateOTP();
-        LocalDateTime otpExpiry = otp.getOtpExpiry();
+        String otpString = OTP.generateOTP();
+        LocalDateTime otpExpiry = OTP.getOtpExpiryTime();
 
         //Send otp
         OtpDTO otpDTO = new OtpDTO(
@@ -177,7 +278,7 @@ public class AuthenticationService{
         if(otpRepository.saveOtp(otpDTO) != 1){
             ErrorBody errorBody = new ErrorBody("Error","Could not login please try again");
             return new ApiResponse(401, errorBody);
-        };
+        }
 
         // publish login event
         try{
@@ -190,13 +291,12 @@ public class AuthenticationService{
         }
 
         // Response
-        LoginResponse loginResponse = new LoginResponse("Check your email for OTP code to verify login");
+        LoginResponse loginResponse = new LoginResponse("Check your email for an OTP code and verify your login");
 
         return new ApiResponse(200, loginResponse);
     }
 
     public ApiResponse verifyLogin(VerifyLoginRequest request){
-
         // validate request email
         User user  = new User();
         user.setEmail(request.getEmail());
@@ -205,14 +305,13 @@ public class AuthenticationService{
             return new ApiResponse(401,errorBody);
         }
         // validate request OTP
-        OTP otp = new OTP(request.getOtp());
-        if(!otp.isOtpValid(request.getOtp())){
+        if(!OTP.isOtpValid(request.getOtp())){
             ErrorBody errorBody = new ErrorBody("Error", "Use a valid OTP");
             return  new ApiResponse(401, errorBody);
         }
 
         // get otp from storage
-        OtpDTO otpDTO = otpRepository.retrieveOtp(request.getOtp(),request.getEmail());
+        OtpDTO otpDTO = otpRepository.retrieveOtpByOtpAndEmail(request.getOtp(),request.getEmail());
 
         // Check if otp has been retrieved from storage
         if (otpDTO.getOtpID() == null){
@@ -221,7 +320,7 @@ public class AuthenticationService{
         }
 
         // Check for otp expiry
-        if (otp.isOtpExpired(otpDTO.getOtpExpiry())){
+        if (OTP.isOtpExpired(otpDTO.getOtpExpiry())){
             ErrorBody errorBody = new ErrorBody("Error", "Your OTP code has expired. Please get a new one");
             return new ApiResponse(401, errorBody);
         }
@@ -237,10 +336,12 @@ public class AuthenticationService{
         }
 
         // Get access and refresh tokens
-        AuthenticationToken authenticationToken = new AuthenticationToken();
-        // get access
-        String accessToken = authenticationToken.getAccessToken(userDTO.getUserId().toString(),new HashMap<>());
-        String refreshToken = authenticationToken.getRefreshToken(userDTO.getUserId().toString(), new HashMap<>());
+        // get access token
+        AccessToken accessTokenObject = new AccessToken();
+        String accessToken = accessTokenObject.getAccessToken(userDTO.getUserId().toString(),new HashMap<>());
+        // get refreshToken
+        RefreshToken refreshTokenObject = new RefreshToken();
+        String refreshToken = refreshTokenObject.getRefreshToken(userDTO.getUserId().toString(), new HashMap<>());
 
         //save refresh token to storage
         AccessTokenDTO token = new AccessTokenDTO();
@@ -264,8 +365,9 @@ public class AuthenticationService{
         VerifyLoginResponse verifyLoginResponse = new VerifyLoginResponse("Logged in successfully",
                 refreshToken,
                 accessToken,
-                AuthenticationToken.getRefreshTokenExpiryDuration(),
-                AuthenticationToken.getAccessTokenExpiryDuration()
+                RefreshToken.getRefreshTokenExpiryDuration(),
+
+                AccessToken.getAccessTokenExpiryDuration()
         );
 
         return new ApiResponse(200,verifyLoginResponse);
@@ -273,25 +375,24 @@ public class AuthenticationService{
     }
 
     public ApiResponse logoutUser(LogoutRequest request, String accessToken){
-        ApiResponse errorResponse = new ApiResponse();
-
         // validate access token
-        AuthenticationToken accessTokenObject = new AuthenticationToken();
-        accessTokenObject.setAccessToken(accessToken);
-        if(!isAccessTokenValid(accessTokenObject, errorResponse)){
+        AccessToken accessTokenObject = new AccessToken(accessToken);
+        ApiResponse errorResponse = validateAccessToken(accessTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
         // validate refresh token
-        AuthenticationToken refreshTokenObject = new AuthenticationToken();
+        RefreshToken refreshTokenObject = new RefreshToken();
         refreshTokenObject.setRefreshToken(request.getRefreshToken());
-        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+        errorResponse = validateRefreshToken(refreshTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
         // Handle mismatch between user ids of the tokens
-        String accessTokenUserId = AuthenticationToken.getSub(accessToken);
-        String refreshTokenUserId = AuthenticationToken.getSub(request.getRefreshToken());
+        String accessTokenUserId = AccessToken.getSub(accessToken);
+        String refreshTokenUserId = RefreshToken.getSub(request.getRefreshToken());
         if(!accessTokenUserId.equals(refreshTokenUserId)){
             ErrorBody errorBody = new ErrorBody("Error", "Unauthorized. Mismatch of access and refresh token ids");
             return new ApiResponse(401, errorBody);
@@ -315,13 +416,10 @@ public class AuthenticationService{
     }
 
     public ApiResponse getUserDetailsByEmail(UserDetailsRequest request, String accessToken){
-        ApiResponse errorResponse = new ApiResponse();
-
-        AuthenticationToken accessTokenObject = new AuthenticationToken();
-        accessTokenObject.setAccessToken(accessToken);
-
         // validate access token
-        if(!isRefreshTokenValid(accessTokenObject, errorResponse)){
+        AccessToken accessTokenObject = new AccessToken(accessToken);
+        ApiResponse errorResponse =validateAccessToken(accessTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
@@ -334,14 +432,15 @@ public class AuthenticationService{
             return new ApiResponse(401,apiError);
         }
 
-        UUID userID = UUID.fromString(AuthenticationToken.getSub(accessToken));
+        // Retrieve userId from access token sub
+        UUID userID = UUID.fromString(AccessToken.getSub(accessToken));
         // Fetch user from storage
         UserDTO userDTO = userRepository.getUserByEmailAndUserId(request.getEmail(), userID);
 
         // Handle token not found in storage
         if(userDTO.getUserId() == null){
             ErrorBody apiError = new ErrorBody("Error", "User does not exist");
-            return new ApiResponse(401,apiError);
+            return new ApiResponse(404,apiError);
         }
 
         // map user details to UserDetailsResponse
@@ -356,26 +455,26 @@ public class AuthenticationService{
     }
 
     public ApiResponse deleteUserAccount(DeleteUserRequest request,String accessToken){
-        ApiResponse errorResponse = new ApiResponse();
-
-        AuthenticationToken accessTokenObject = new AuthenticationToken();
-        accessTokenObject.setAccessToken(accessToken);
         // validate access token
-        if(!isAccessTokenValid(accessTokenObject, errorResponse)){
+        AccessToken accessTokenObject = new AccessToken(accessToken);
+        ApiResponse errorResponse = validateAccessToken(accessTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
 
-        AuthenticationToken refreshTokenObject = new AuthenticationToken();
-        refreshTokenObject.setRefreshToken(request.getRefreshToken());
+
         // validate refresh token
-        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+        RefreshToken refreshTokenObject = new RefreshToken(request.getRefreshToken());
+        errorResponse = validateRefreshToken(refreshTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
-        String accessTokenUserId = AuthenticationToken.getSub(accessToken);
-        String refreshTokenUserId = AuthenticationToken.getSub(request.getRefreshToken());
-        // Handle mismatch between user ids of the tokens
+        // Retrieve user id from access and refresh tokens
+        String accessTokenUserId = AccessToken.getSub(accessToken);
+        String refreshTokenUserId = RefreshToken.getSub(request.getRefreshToken());
+        // Handle mismatch between user ids retrieved from tokens
         if(!accessTokenUserId.equals(refreshTokenUserId)){
             ErrorBody errorBody = new ErrorBody("Error", "Unauthorized. Mismatch of access and refresh token ids");
             return new ApiResponse(401,errorBody);
@@ -392,9 +491,8 @@ public class AuthenticationService{
         }
 
         //Generate otp
-        OTP otp = new OTP();
-        String otpString = otp.generateOTP();
-        LocalDateTime otpExpiry = otp.getOtpExpiry();
+        String otpString = OTP.generateOTP();
+        LocalDateTime otpExpiry = OTP.getOtpExpiryTime();
 
         //Send otp
         OtpDTO otpDTO = new OtpDTO(
@@ -408,7 +506,7 @@ public class AuthenticationService{
         if(otpRepository.saveOtp(otpDTO) != 1){
             ErrorBody errorBody = new ErrorBody("Error","Could not login please try again");
             return new ApiResponse(401, errorBody);
-        };
+        }
 
         // publish delete user account event
         try{
@@ -427,27 +525,26 @@ public class AuthenticationService{
         return new ApiResponse(200, deleteUserResponse);
     }
 
-
-    public ApiResponse verifyDeleteUserAccount(VerifyDeleteUserRequest request, String accessToken){        ApiResponse errorResponse = new ApiResponse();
-
-        AuthenticationToken accessTokenObject = new AuthenticationToken();
-        accessTokenObject.setAccessToken(accessToken);
+    public ApiResponse verifyDeleteUserAccount(VerifyDeleteUserRequest request, String accessToken){
         // validate access token
-        if(!isAccessTokenValid(accessTokenObject, errorResponse)){
+        AccessToken accessTokenObject = new AccessToken(accessToken);
+        ApiResponse errorResponse = validateAccessToken(accessTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
 
-        AuthenticationToken refreshTokenObject = new AuthenticationToken();
-        refreshTokenObject.setRefreshToken(request.getRefreshToken());
         // validate refresh token
-        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+        RefreshToken refreshTokenObject = new RefreshToken(request.getRefreshToken());
+        errorResponse = validateRefreshToken(refreshTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
-        String accessTokenUserId = AuthenticationToken.getSub(accessToken);
-        String refreshTokenUserId = AuthenticationToken.getSub(request.getRefreshToken());
-        // Handle mismatch between user ids of the tokens
+        // Retrieve user id from access and refresh tokens
+        String accessTokenUserId = AccessToken.getSub(accessToken);
+        String refreshTokenUserId = RefreshToken.getSub(request.getRefreshToken());
+        // Handle mismatch between user ids retrieved from tokens
         if(!accessTokenUserId.equals(refreshTokenUserId)){
             ErrorBody errorBody = new ErrorBody("Error", "Unauthorized. Mismatch of access and refresh token ids");
             return new ApiResponse(401,errorBody);
@@ -461,7 +558,7 @@ public class AuthenticationService{
         // Handle token not found in storage
         if(userDTO.getUserId() == null){
             ErrorBody apiError = new ErrorBody("Error", "User does not exist");
-            return new ApiResponse(401,apiError);
+            return new ApiResponse(404,apiError);
         }
 
 
@@ -475,14 +572,13 @@ public class AuthenticationService{
         }
 
         // validate request OTP
-        OTP otp = new OTP(request.getOtp());
-        if(!otp.isOtpValid(request.getOtp())){
+        if(!OTP.isOtpValid(request.getOtp())){
             ErrorBody errorBody = new ErrorBody("Error", "Use a valid OTP");
             return  new ApiResponse(401, errorBody);
         }
 
         // get otp from storage
-        OtpDTO otpDTO = otpRepository.retrieveOtp(request.getOtp(),request.getEmail());
+        OtpDTO otpDTO = otpRepository.retrieveOtpByOtpAndEmail(request.getOtp(),request.getEmail());
 
         // Check if otp has been retrieved from storage
         if (otpDTO.getOtpID() == null){
@@ -491,7 +587,7 @@ public class AuthenticationService{
         }
 
         // Check for otp expiry
-        if (otp.isOtpExpired(otpDTO.getOtpExpiry())){
+        if (OTP.isOtpExpired(otpDTO.getOtpExpiry())){
             ErrorBody errorBody = new ErrorBody("Error", "Your OTP code has expired. Please get a new one");
             return new ApiResponse(401, errorBody);
         }
@@ -502,7 +598,7 @@ public class AuthenticationService{
         // Handle token not found in storage
         if(rowsAffected != 1){
             ErrorBody errorBody = new ErrorBody("Error", "Error deleting account");
-            return new ApiResponse(404, errorBody);
+            return new ApiResponse(400, errorBody);
         }
 
         // delete OTP from storage
@@ -519,7 +615,6 @@ public class AuthenticationService{
 
         return new ApiResponse(200, verifyDeleteUserResponse);
     }
-
 
     public ApiResponse resetPassword(PasswordResetRequest request){
         User user = new User();
@@ -542,9 +637,8 @@ public class AuthenticationService{
         }
 
         //Generate otp
-        OTP otp = new OTP();
-        String otpString = otp.generateOTP();
-        LocalDateTime otpExpiry = otp.getOtpExpiry();
+        String otpString = OTP.generateOTP();
+        LocalDateTime otpExpiry = OTP.getOtpExpiryTime();
 
         //Send otp
         OtpDTO otpDTO = new OtpDTO(
@@ -558,7 +652,7 @@ public class AuthenticationService{
         if(otpRepository.saveOtp(otpDTO) != 1){
             ErrorBody errorBody = new ErrorBody("Error","Could not login please try again");
             return new ApiResponse(401, errorBody);
-        };
+        }
 
         // publish password reset event
         try{
@@ -595,14 +689,13 @@ public class AuthenticationService{
         }
 
         // validate request OTP
-        OTP otp = new OTP(request.getOtp());
-        if(!otp.isOtpValid(request.getOtp())){
-            ErrorBody errorBody = new ErrorBody("Error", "Use a valid OTP");
+        if(!OTP.isOtpValid(request.getOtp())){
+            ErrorBody errorBody = new ErrorBody("Error", "Use a valid OTP code");
             return  new ApiResponse(401, errorBody);
         }
 
         // get otp from storage
-        OtpDTO otpDTO = otpRepository.retrieveOtp(request.getOtp(),request.getEmail());
+        OtpDTO otpDTO = otpRepository.retrieveOtpByOtpAndEmail(request.getOtp(),request.getEmail());
 
         // Check if otp has been retrieved from storage
         if (otpDTO.getOtpID() == null){
@@ -611,7 +704,7 @@ public class AuthenticationService{
         }
 
         // Check for otp expiry
-        if (otp.isOtpExpired(otpDTO.getOtpExpiry())){
+        if (OTP.isOtpExpired(otpDTO.getOtpExpiry())){
             ErrorBody errorBody = new ErrorBody("Error", "Your OTP code has expired. Please get a new one");
             return new ApiResponse(401, errorBody);
         }
@@ -645,29 +738,24 @@ public class AuthenticationService{
         return new ApiResponse(200, verifyPasswordResetResponse);
 
     }
-
-
-
-
-
+    
     public ApiResponse renewAccessToken(RenewAccessTokenRequest request){
-        ApiResponse errorResponse = new ApiResponse();
 
         // validate refresh token
-        AuthenticationToken refreshTokenObject = new AuthenticationToken();
-        refreshTokenObject.setRefreshToken(request.getAccessToken());
-        if(!isRefreshTokenValid(refreshTokenObject, errorResponse)){
+        RefreshToken refreshTokenObject = new RefreshToken(request.getRefreshToken());
+        ApiResponse errorResponse = validateRefreshToken(refreshTokenObject);
+        if(errorResponse != null){
             return errorResponse;
         }
 
         // Get new access token
-        String tokenSub = AuthenticationToken.getSub(refreshTokenObject.getRefreshToken());
-        String newAccessToken = new AuthenticationToken().getAccessToken(tokenSub,new HashMap<>());
+        String refreshTokenSub = RefreshToken.getSub(refreshTokenObject.getRefreshToken());
+        String newAccessToken = new AccessToken().getAccessToken(refreshTokenSub,new HashMap<>());
 
         // Response
         RenewAccessTokenResponse renewAccessTokenResponse  = new RenewAccessTokenResponse(
                 newAccessToken,
-                AuthenticationToken.getAccessTokenExpiryDuration()
+                AccessToken.getAccessTokenExpiryDuration()
         );
 
 
@@ -697,11 +785,11 @@ public class AuthenticationService{
         }
 
         // Check if userName exists
-        UserDTO userByName = userRepository.getUserByUserName(user.getUserName().toLowerCase());
-        if(!(userByName.getUserId() == null)){
-            ErrorBody errorBody = new ErrorBody("Error","User name already taken");
-            return new ApiResponse(400, errorBody);
-        }
+//        UserDTO userByName = userRepository.getUserByUserName(user.getUserName().toLowerCase());
+//        if(!(userByName.getUserId() == null)){
+//            ErrorBody errorBody = new ErrorBody("Error","User name already taken");
+//            return new ApiResponse(400, errorBody);
+//        }
 
         // check if passwords match
         if (!User.doPasswordsMatch(request.getPassword(), request.getConfirmPassword())) {
@@ -721,76 +809,76 @@ public class AuthenticationService{
             return  new ApiResponse(400, errorBody);
         }
 
-        // check if account already exists
-        UserDTO userByEmail = userRepository.getUserByEmail(user.getEmail().toLowerCase());
-        if(!(userByEmail.getUserId() == null)){
-            ErrorBody errorBody = new ErrorBody("Error","Account created using this email already exists");
-            return new ApiResponse(400, errorBody);
-        }
+//        // check if account already exists
+//        UserDTO userByEmail = userRepository.getUserByEmail(user.getEmail().toLowerCase());
+//        if(!(userByEmail.getUserId() == null)){
+//            ErrorBody errorBody = new ErrorBody("Error","Account created using this email already exists");
+//            return new ApiResponse(400, errorBody);
+//        }
 
 
         return null;
     }
 
-    public boolean isAccessTokenValid(AuthenticationToken tokenObject, ApiResponse apiResponse){
+    public ApiResponse validateAccessToken(AccessToken tokenObject){
 
         // Handle empty token
         if(tokenObject.isAccessTokenProvided()){
             ErrorBody errorBody = new ErrorBody("Error", "No access token provided in the header provided");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
         // Handle compromised refresh token
-        if(AuthenticationToken.isAccessTokenCompromised(tokenObject.getAccessToken())){
+        if(AccessToken.isAccessTokenCompromised(tokenObject.getAccessToken())){
             ErrorBody errorBody = new ErrorBody("Error", "The integrity of the access token has been compromised");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
         // Handle expired token
-        if(AuthenticationToken.isTokenExpired(tokenObject.getAccessToken())){
+        if(AccessToken.isTokenExpired(tokenObject.getAccessToken())){
             ErrorBody errorBody = new ErrorBody("Error", "Access token has expired");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
-        return true;
+        return null;
     }
 
-    public boolean isRefreshTokenValid(AuthenticationToken tokenObject, ApiResponse apiResponse){
+    public ApiResponse validateRefreshToken(RefreshToken tokenObject){
         // Handle empty token
         if(tokenObject.isRefreshTokenProvided()){
             ErrorBody errorBody = new ErrorBody("Error", "No refresh token provided in the header provided");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
         // check for refresh token in storage
-        TokenDAO tokenDAO = new TokenDAO();
-        AccessTokenDTO tokenDTO = tokenDAO.fetchRefreshToken(tokenObject.getRefreshToken());
+        AccessTokenDTO tokenDTO = tokenRepository.fetchRefreshToken(tokenObject.getRefreshToken());
 
         if(tokenDTO.getTokenId().toString().isEmpty()){
             ErrorBody errorBody = new ErrorBody("Error", "Invalid refresh token");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
         // Handle compromised refresh token
-        if(AuthenticationToken.isRefreshTokenCompromised(tokenObject.getRefreshToken())){
+        if(RefreshToken.isRefreshTokenCompromised(tokenObject.getRefreshToken())){
             ErrorBody errorBody = new ErrorBody("Error", "The integrity of the refresh token has been compromised");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
         // Handle expired token
-        if(AuthenticationToken.isTokenExpired(tokenObject.getRefreshToken())){
+        if(RefreshToken.isTokenExpired(tokenObject.getRefreshToken())){
             ErrorBody errorBody = new ErrorBody("Error", "Refresh token has expired");
-            apiResponse = new ApiResponse(401,errorBody);
-            return false;
+            return new ApiResponse(401,errorBody);
         }
 
-        return true;
+        return null;
+    }
+
+    public  static AuthenticationService getInstance(){
+        return new AuthenticationService(
+                new UserDAO(),
+                new TokenDAO(),
+                new MessageDigestInfrastructure(),
+                new OtpDAO());
     }
 
 

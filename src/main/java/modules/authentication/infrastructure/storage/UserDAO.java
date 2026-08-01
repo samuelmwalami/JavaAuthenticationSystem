@@ -18,7 +18,7 @@ public class UserDAO implements UserRepository {
         String QUERY = "INSERT INTO person(id, first_name, last_name, user_name, email, user_password) " +
                 "VALUES(?,?,?,?,?,?)";
 
-        int rowsAffected = 0;
+
         try(Connection connection = DatabaseConnector.getDatabaseConnection();
             PreparedStatement statement = connection.prepareStatement(QUERY);
             ){
@@ -37,7 +37,7 @@ public class UserDAO implements UserRepository {
         catch (SQLException e){
             e.printStackTrace();
         }
-        return rowsAffected;
+        return 0;
     }
 
     @Override
@@ -106,7 +106,6 @@ public class UserDAO implements UserRepository {
         String QUERY = "DELETE FROM user " +
                 "WHERE email = ? AND id = ?";
 
-        int rowsAffected = 0;
 
         try(Connection conn = DatabaseConnector.getDatabaseConnection();
             PreparedStatement statement = conn.prepareStatement(QUERY)){
@@ -119,7 +118,7 @@ public class UserDAO implements UserRepository {
             e.printStackTrace();
         }
 
-        return rowsAffected;
+        return 0;
     }
 
     @Override
@@ -194,7 +193,6 @@ public class UserDAO implements UserRepository {
                 "SET password  = ? " +
                 "WHERE email = ?";
 
-        int rowsAffected = 0;
 
         try(Connection conn = DatabaseConnector.getDatabaseConnection();
         PreparedStatement statement = conn.prepareStatement(QUERY)) {
@@ -208,6 +206,26 @@ public class UserDAO implements UserRepository {
             e.printStackTrace();
         }
 
-        return rowsAffected;
+        return 0;
     }
+
+    @Override
+    public int setTrueEmailVerificationStatus(String email) {
+        final String QUERY = "UPDATE person " +
+                "SET email_verified = true " +
+                "WHERE email = ?";
+
+        try(Connection conn = DatabaseConnector.getDatabaseConnection();
+        PreparedStatement statement = conn.prepareStatement(QUERY)){
+            statement.setString(1, email);
+
+           return statement.executeUpdate();
+        }
+        catch (SQLException e){
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+
 }

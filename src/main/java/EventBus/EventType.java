@@ -4,5 +4,6 @@ public enum EventType {
     LOGIN,
     REGISTRATION,
     PASSWORD_RESET,
-    DELETE_ACCOUNT
+    DELETE_ACCOUNT,
+    OTP,
 }

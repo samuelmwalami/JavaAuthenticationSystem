@@ -10,7 +10,7 @@ public class EventBus {
 
     }
 
-    HashMap<EventType, HashSet<Listener>> subscribers;
+    HashMap<EventType, HashSet<Listener>> subscribers = new HashMap<>();
 
     public void subscribe(EventType eventType, Listener listener){
         HashSet<Listener> listeners = new HashSet<>();
@@ -32,6 +32,8 @@ public class EventBus {
     public void publish(EventType eventType, String message){
         if(subscribers.containsKey(eventType)){
             for(Listener listener : subscribers.get(eventType)){
+                IO.println(String.format("Invoking %s", listener.toString()));
+                IO.println(String.format("For eventType %s and message %s",eventType,message));
                 listener.invokeListener(eventType, message);
             }
         }

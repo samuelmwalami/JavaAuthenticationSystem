@@ -19,7 +19,7 @@ public class RenewAccessToken extends HttpServlet {
     ObjectMapper mapper;
     @Override
     public void init(){
-        authenticationService = new AuthenticationService();
+        authenticationService = AuthenticationService.getInstance();
         mapper = new ObjectMapper();
     }
 

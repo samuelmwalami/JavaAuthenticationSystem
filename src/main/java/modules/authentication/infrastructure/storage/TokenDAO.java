@@ -59,7 +59,7 @@ public class TokenDAO implements TokenRepository {
     @Override
     public int updateRefreshTokenByUserId(UUID userId, String refreshToken) {
         int rowsAffected = 0;
-        final String QUERY = "UPDATE jwt SET refresh_token = ? WHERE user_id = ? ON CONFLICT(user_id) DO UPDATE SET refresh_token = excluded.refreshToken ";
+        final String QUERY = "UPDATE jwt SET refresh_token = ? WHERE user_id = ?";
 
         try(Connection conn  = DatabaseConnector.getDatabaseConnection();
             PreparedStatement statement = conn.prepareStatement(QUERY)){

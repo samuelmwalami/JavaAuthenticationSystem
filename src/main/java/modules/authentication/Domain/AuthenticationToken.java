@@ -4,6 +4,7 @@ import lib.jwt.JWT;
 import utils.ConfigReaders.JWTConfigReader;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 
@@ -31,8 +32,8 @@ public class AuthenticationToken {
          */
         public static boolean isTokenExpired(String jwtToken){
             JWT jwtObject  = new JWT.Builder().compact();
-            long currentEpoch = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-            long jwtExpirationEpoch = (long) jwtObject.getPayloadClaim(jwtToken,"exp");
+            long currentEpoch = LocalDateTime.now(ZoneId.of("UTC")).toEpochSecond(ZoneOffset.UTC);
+            long jwtExpirationEpoch = ((Number) jwtObject.getPayloadClaim(jwtToken,"exp")).longValue();
             return currentEpoch > jwtExpirationEpoch;
         }
 

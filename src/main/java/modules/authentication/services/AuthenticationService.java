@@ -33,7 +33,7 @@ public class AuthenticationService{
     OtpRepository otpRepository;
     ObjectMapper mapper = new ObjectMapper();
 
-    private AuthenticationService(
+    AuthenticationService(
             UserRepository userRepository,
             TokenRepository tokenRepository,
             MessageDigestInfrastructure messageDigestInfrastructure,
@@ -780,16 +780,10 @@ public class AuthenticationService{
         }
 
         if (!user.isUserNameValid()) {
-            ErrorBody errorBody = new ErrorBody("Error","Invalid user name");
-            return new ApiResponse(400, errorBody);
-        }
-
-        // Check if userName exists
-//        UserDTO userByName = userRepository.getUserByUserName(user.getUserName().toLowerCase());
-//        if(!(userByName.getUserId() == null)){
-//            ErrorBody errorBody = new ErrorBody("Error","User name already taken");
-//            return new ApiResponse(400, errorBody);
-//        }
+            ErrorBody errorBody = new Errif(!(userByName.getUserId() == null)){
+                ErrorBody errorBody = new ErrorBody("Error","User name already taken");
+                return new ApiResponse(400, errorBody);
+            }
 
         // check if passwords match
         if (!User.doPasswordsMatch(request.getPassword(), request.getConfirmPassword())) {
@@ -809,12 +803,12 @@ public class AuthenticationService{
             return  new ApiResponse(400, errorBody);
         }
 
-//        // check if account already exists
-//        UserDTO userByEmail = userRepository.getUserByEmail(user.getEmail().toLowerCase());
-//        if(!(userByEmail.getUserId() == null)){
-//            ErrorBody errorBody = new ErrorBody("Error","Account created using this email already exists");
-//            return new ApiResponse(400, errorBody);
-//        }
+        // check if account already exists
+        UserDTO userByEmail = userRepository.getUserByEmail(user.getEmail().toLowerCase());
+        if(!(userByEmail.getUserId() == null)){
+            ErrorBody errorBody = new ErrorBody("Error","Account created using this email already exists");
+            return new ApiResponse(400, errorBody);
+        }
 
 
         return null;

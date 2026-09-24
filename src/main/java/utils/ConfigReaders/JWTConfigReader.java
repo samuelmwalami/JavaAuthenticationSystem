@@ -31,8 +31,8 @@ public class JWTConfigReader{
 
             this.JWT_REFRESH_TOKEN_SECRET = property.getProperty("jwt.refreshTokenSecret");
             this.JWT_ACCESS_TOKEN_SECRET = property.getProperty("jwt.accessTokenSecret");
-            this.REFRESH_TOKEN_EXPIRATION_DURATION = Long.getLong(property.getProperty("jwt.refreshTokenExpiryDuration"));
-            this.ACCESS_TOKEN_EXPIRATION_DURATION = Long.getLong(property.getProperty("jwt.accessTokenExpiryDuration"));
+            this.REFRESH_TOKEN_EXPIRATION_DURATION = Long.parseLong(property.getProperty("jwt.refreshTokenExpiryDuration"));
+            this.ACCESS_TOKEN_EXPIRATION_DURATION = Long.parseLong(property.getProperty("jwt.accessTokenExpiryDuration"));
         }
         catch (IOException e){
             e.printStackTrace();

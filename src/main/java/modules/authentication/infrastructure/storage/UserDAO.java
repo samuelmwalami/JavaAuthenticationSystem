@@ -103,7 +103,7 @@ public class UserDAO implements UserRepository {
 
     @Override
     public int deleteUserByEmailAndUserId(String email, UUID userId){
-        String QUERY = "DELETE FROM user " +
+        String QUERY = "DELETE FROM person " +
                 "WHERE email = ? AND id = ?";
 
 
@@ -190,7 +190,7 @@ public class UserDAO implements UserRepository {
     @Override
     public int updatePasswordByEmail(String email, String password) {
         final String QUERY = "UPDATE person " +
-                "SET password  = ? " +
+                "SET user_password  = ? " +
                 "WHERE email = ?";
 
 

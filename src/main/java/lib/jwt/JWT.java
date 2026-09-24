@@ -7,6 +7,7 @@ import lib.jwt.Exceptions.IatGreaterThanExpException;
 
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.Mac;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -96,7 +97,7 @@ public class JWT {
         try{
             // extract claim from the jwt
             String[] jwtParts  = JWTToken.split("\\.");
-            String base64jwtPayload = Arrays.toString(Base64.getDecoder().decode(jwtParts[1]));
+            String base64jwtPayload = new String(Base64.getDecoder().decode(jwtParts[1]), StandardCharsets.UTF_8);
             ObjectMapper mapper = new ObjectMapper();
             TreeMap<Object,Object> claims  = mapper.readValue(base64jwtPayload, new TypeReference<TreeMap<Object, Object>>() {});
             if(!claims.containsKey(claim)){

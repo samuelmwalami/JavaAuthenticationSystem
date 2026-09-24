@@ -52,7 +52,7 @@ public class AccessToken extends AuthenticationToken{
         JWT jwtObject = new JWT.Builder()
                 .setSecret(jwtConfigReader.getJWT_ACCESS_TOKEN_SECRET())
                 .compact();
-        return jwtObject.verifyJWT(jwtToken);
+        return !jwtObject.verifyJWT(jwtToken);
     }
 
     public boolean isAccessTokenProvided(){

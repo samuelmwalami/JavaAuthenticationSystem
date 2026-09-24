@@ -65,7 +65,7 @@ public class RefreshToken extends AuthenticationToken{
         JWT jwtObject = new JWT.Builder()
                 .setSecret(jwtConfigReader.getJWT_REFRESH_TOKEN_SECRET())
                 .compact();
-        return jwtObject.verifyJWT(jwtToken);
+        return !jwtObject.verifyJWT(jwtToken);
 
     }
 
@@ -74,6 +74,6 @@ public class RefreshToken extends AuthenticationToken{
     }
 
     public static int getRefreshTokenExpiryDuration(){
-        return (int) jwtConfigReader.getACCESS_TOKEN_EXPIRATION_DURATION();
+        return (int) jwtConfigReader.getREFRESH_TOKEN_EXPIRATION_DURATION();
     }
 }

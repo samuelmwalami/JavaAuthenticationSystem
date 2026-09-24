@@ -41,8 +41,8 @@ public class OtpDAO implements OtpRepository {
 
     @Override
     public OtpDTO retrieveOtpByOtpAndEmail(String otp, String email) {
-        final String QUERY = "SELECT otp.id, otp.otp, otp.expiry person.email FROM otp" +
-                "INNER JOIN person ON otp.email = person.email" +
+        final String QUERY = "SELECT otp.id, otp.otp, otp.expiry, person.email FROM otp " +
+                "INNER JOIN person ON otp.email = person.email " +
                 "WHERE otp.otp = ? AND person.email = ?";
 
         OtpDTO otpDTO = new OtpDTO();
@@ -71,8 +71,8 @@ public class OtpDAO implements OtpRepository {
 
     @Override
     public OtpDTO retrieveOtpByEmail(String email) {
-        final String QUERY = "SELECT otp.id, otp.otp, otp.expiry person.email FROM otp" +
-                "INNER JOIN person ON otp.email = person.email" +
+        final String QUERY = "SELECT otp.id, otp.otp, otp.expiry person.email FROM otp " +
+                "INNER JOIN person ON otp.email = person.email " +
                 "WHERE person.email = ?";
 
         OtpDTO otpDTO = new OtpDTO();
@@ -80,7 +80,7 @@ public class OtpDAO implements OtpRepository {
         try(Connection conn = DatabaseConnector.getDatabaseConnection();
             PreparedStatement statement = conn.prepareStatement(QUERY)) {
 
-            statement.setString(2, email);
+            statement.setString(1, email);
 
             ResultSet resultSet = statement.executeQuery();
 
